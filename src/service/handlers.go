@@ -107,7 +107,7 @@ func StatusRequestHandler(gw Gatewayer) daemon.Handler {
 			return
 		}
 
-		ack := daemon.UnifiedResponse{}
+		ack := daemon.StatusResponse{}
 		ack.Id = req.ID()
 
 		sts, err := gw.GetDepositStatuses(req.SkyAddress)

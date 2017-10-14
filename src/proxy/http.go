@@ -360,12 +360,15 @@ func BindHandler(srv *httpServ) http.HandlerFunc {
 		srv.Printf("Received response to BindRequest: %+v\n", *rsp)
 
 		if rsp.Error != "" {
-			httputil.ErrResponse(w, http.StatusBadRequest, rsp.Error)
+			//httputil.ErrResponse(w, http.StatusBadRequest, rsp.Error)
+			httputil.JSONResponse(w, makeUnifiedHTTPResponse(http.StatusBadRequest, "", rsp.Error))
 			srv.Println(rsp.Error)
 			return
 		}
 
-		if err := httputil.JSONResponse(w, makeBindHTTPResponse(*rsp)); err != nil {
+		tmp := makeBindHTTPResponse(*rsp)
+		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
+		if err := httputil.JSONResponse(w, unifiedres); err != nil {
 			srv.Println(err)
 		}
 	}
@@ -423,18 +426,14 @@ func StatusHandler(srv *httpServ) http.HandlerFunc {
 		srv.Printf("Received response to StatusRequest: %+v\n", *rsp)
 
 		if rsp.Error != "" {
-			httputil.ErrResponse(w, http.StatusBadRequest, rsp.Error)
+			//httputil.ErrResponse(w, http.StatusBadRequest, rsp.Error)
+			httputil.JSONResponse(w, makeUnifiedHTTPResponse(http.StatusBadRequest, "", rsp.Error))
 			srv.Println(rsp.Error)
 			return
 		}
 
 		tmp := makeStatusHTTPResponse(*rsp)
-		tmpjson, err := json.Marshal(tmp)
-		if err != nil {
-			return
-		}
-
-		unifiedres := makeUnifiedHTTPResponse(0, string(tmpjson), "")
+		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
 
 		if err := httputil.JSONResponse(w, unifiedres); err != nil {
 			srv.Println(err)
@@ -449,6 +448,7 @@ func readyToStart(w http.ResponseWriter, gw gatewayer, startAt time.Time) bool {
 
 	msg := fmt.Sprintf("Event starts at %v", startAt)
 	httputil.ErrResponse(w, http.StatusForbidden, msg)
+	httputil.JSONResponse(w, makeUnifiedHTTPResponse(http.StatusForbidden, "", msg))
 	gw.Println(http.StatusForbidden, msg)
 
 	return false
@@ -472,7 +472,8 @@ func validMethod(w http.ResponseWriter, r *http.Request, gw gatewayer, allowed [
 func verifySkycoinAddress(w http.ResponseWriter, gw gatewayer, skyAddr string) bool {
 	if _, err := cipher.DecodeBase58Address(skyAddr); err != nil {
 		msg := fmt.Sprintf("Invalid skycoin address: %v", err)
-		httputil.ErrResponse(w, http.StatusBadRequest, msg)
+		//httputil.ErrResponse(w, http.StatusBadRequest, msg)
+		httputil.JSONResponse(w, makeUnifiedHTTPResponse(http.StatusBadRequest, "", msg))
 		gw.Println(http.StatusBadRequest, "Invalid skycoin address:", err, skyAddr)
 		return false
 	}
@@ -495,5 +496,11 @@ func handleGatewayResponseError(w http.ResponseWriter, gw gatewayer, err error) 
 
 func errorResponse(w http.ResponseWriter, gw gatewayer, code int, msgs ...interface{}) {
 	gw.Println(append([]interface{}{code, http.StatusText(code)}, msgs...)...)
-	httputil.ErrResponse(w, code)
+	strarr := []string{}
+	for _, v := range msgs {
+		strarr = append(strarr, v.(string))
+	}
+
+	unifiedres := makeUnifiedHTTPResponse(code, "", strings.Join(strarr, ""))
+	httputil.JSONResponse(w, unifiedres)
 }

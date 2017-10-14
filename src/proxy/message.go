@@ -9,9 +9,9 @@ type BindResponse struct {
 	// Error      string `json:"error,omitempty"`
 }
 type UnifiedResponse struct {
-	Errmsg string `json:"errmsg,omitempty"`
-	Ok     int    `json:"ok"`
-	Data   string `json:"data"`
+	Errmsg string      `json:"errmsg"`
+	Code   int         `json:"code"`
+	Data   interface{} `json:"data"`
 	// Error      string `json:"error,omitempty"`
 }
 
@@ -35,9 +35,9 @@ func makeStatusHTTPResponse(rsp daemon.StatusResponse) StatusResponse {
 		// Error:    rsp.Error,
 	}
 }
-func makeUnifiedHTTPResponse(ok int, data, errmsg string) UnifiedResponse {
+func makeUnifiedHTTPResponse(code int, data interface{}, errmsg string) UnifiedResponse {
 	return UnifiedResponse{
-		Ok:     ok,
+		Code:   code,
 		Data:   data,
 		Errmsg: errmsg,
 		// Error:    rsp.Error,
