@@ -77,6 +77,7 @@ func BindRequestHandler(gw Gatewayer) daemon.Handler {
 			ack.Error = fmt.Sprintf("Bind address failed: %v", err)
 		} else {
 			ack.BtcAddress = btcAddr
+			ack.CoinType = req.CoinType
 		}
 
 		gw.Printf("BindRequestHandler req=%+v ack=%+v\n", *req, ack)
@@ -106,7 +107,7 @@ func StatusRequestHandler(gw Gatewayer) daemon.Handler {
 			return
 		}
 
-		ack := daemon.StatusResponse{}
+		ack := daemon.UnifiedResponse{}
 		ack.Id = req.ID()
 
 		sts, err := gw.GetDepositStatuses(req.SkyAddress)
@@ -116,6 +117,7 @@ func StatusRequestHandler(gw Gatewayer) daemon.Handler {
 			ack.Error = errStr
 		} else {
 			ack.Statuses = sts
+			ack.CoinType = req.CoinType
 		}
 
 		gw.Printf("StatusRequestHandler req=%+v ack=%+v\n", *req, ack)

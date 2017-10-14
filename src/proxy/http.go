@@ -322,8 +322,17 @@ func BindHandler(srv *httpServ) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
+		fmt.Printf("=%+v\n", r.Body)
 		if userBindReq.SkyAddr == "" {
-			errorResponse(w, srv.Gateway, http.StatusBadRequest, "Missing skyaddr")
+			errorResponse(w, srv.Gateway, http.StatusBadRequest, "Missing address")
+			return
+		}
+		if userBindReq.PlanCoinType == "" {
+			errorResponse(w, srv.Gateway, http.StatusBadRequest, "Missing plan_coin_type")
+			return
+		}
+		if userBindReq.CoinType == "" {
+			errorResponse(w, srv.Gateway, http.StatusBadRequest, "Missing coin_type")
 			return
 		}
 
@@ -338,7 +347,7 @@ func BindHandler(srv *httpServ) http.HandlerFunc {
 		cxt, cancel := context.WithTimeout(r.Context(), proxyRequestTimeout)
 		defer cancel()
 
-		daemonBindReq := daemon.BindRequest{SkyAddress: userBindReq.SkyAddr}
+		daemonBindReq := daemon.BindRequest{SkyAddress: userBindReq.SkyAddr, PlanCoinType: userBindReq.PlanCoinType, CoinType: userBindReq.CoinType}
 
 		srv.Println("Sending BindRequest to teller, skyaddr", userBindReq.SkyAddr)
 
@@ -363,7 +372,9 @@ func BindHandler(srv *httpServ) http.HandlerFunc {
 }
 
 type bindRequest struct {
-	SkyAddr string `json:"skyaddr"`
+	SkyAddr      string `json:"address"`
+	PlanCoinType string `json:"plan_coin_type"`
+	CoinType     string `json:"coin_type"`
 }
 
 // StatusHandler returns the deposit status of specific skycoin address
@@ -377,13 +388,18 @@ func StatusHandler(srv *httpServ) http.HandlerFunc {
 			return
 		}
 
-		skyAddr := r.URL.Query().Get("skyaddr")
+		skyAddr := r.URL.Query().Get("address")
 		if skyAddr == "" {
 			errorResponse(w, srv.Gateway, http.StatusBadRequest, "Missing skyaddr")
 			return
 		}
 
 		if !verifySkycoinAddress(w, srv.Gateway, skyAddr) {
+			return
+		}
+		coinType := r.URL.Query().Get("coin_type")
+		if coinType == "" {
+			errorResponse(w, srv.Gateway, http.StatusBadRequest, "Missing coin_type")
 			return
 		}
 
@@ -394,7 +410,7 @@ func StatusHandler(srv *httpServ) http.HandlerFunc {
 		cxt, cancel := context.WithTimeout(r.Context(), proxyRequestTimeout)
 		defer cancel()
 
-		stReq := daemon.StatusRequest{SkyAddress: skyAddr}
+		stReq := daemon.StatusRequest{SkyAddress: skyAddr, CoinType: coinType}
 
 		srv.Println("Sending StatusRequest to teller, skyaddr", skyAddr)
 
@@ -412,7 +428,15 @@ func StatusHandler(srv *httpServ) http.HandlerFunc {
 			return
 		}
 
-		if err := httputil.JSONResponse(w, makeStatusHTTPResponse(*rsp)); err != nil {
+		tmp := makeStatusHTTPResponse(*rsp)
+		tmpjson, err := json.Marshal(tmp)
+		if err != nil {
+			return
+		}
+
+		unifiedres := makeUnifiedHTTPResponse(0, string(tmpjson), "")
+
+		if err := httputil.JSONResponse(w, unifiedres); err != nil {
 			srv.Println(err)
 		}
 	}

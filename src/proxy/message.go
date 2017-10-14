@@ -4,7 +4,14 @@ import "github.com/skycoin/teller/src/daemon"
 
 // BindResponse http response for /api/bind
 type BindResponse struct {
-	BtcAddress string `json:"btc_address,omitempty"`
+	BtcAddress string `json:"address,omitempty"`
+	CoinType   string `json:"coin_type"`
+	// Error      string `json:"error,omitempty"`
+}
+type UnifiedResponse struct {
+	Errmsg string `json:"errmsg,omitempty"`
+	Ok     int    `json:"ok"`
+	Data   string `json:"data"`
 	// Error      string `json:"error,omitempty"`
 }
 
@@ -17,6 +24,7 @@ type StatusResponse struct {
 func makeBindHTTPResponse(rsp daemon.BindResponse) BindResponse {
 	return BindResponse{
 		BtcAddress: rsp.BtcAddress,
+		CoinType:   rsp.CoinType,
 		// Error:      rsp.Error,
 	}
 }
@@ -24,6 +32,14 @@ func makeBindHTTPResponse(rsp daemon.BindResponse) BindResponse {
 func makeStatusHTTPResponse(rsp daemon.StatusResponse) StatusResponse {
 	return StatusResponse{
 		Statuses: rsp.Statuses,
+		// Error:    rsp.Error,
+	}
+}
+func makeUnifiedHTTPResponse(ok int, data, errmsg string) UnifiedResponse {
+	return UnifiedResponse{
+		Ok:     ok,
+		Data:   data,
+		Errmsg: errmsg,
 		// Error:    rsp.Error,
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	"github.com/skycoin/skycoin/src/cipher"
+	//"github.com/skycoin/skycoin/src/cipher"
 	"github.com/skycoin/teller/src/logger"
 )
 
@@ -60,11 +60,11 @@ func New(db *bolt.DB, addrsReader io.Reader, log logger.Logger) (*BtcAddrs, erro
 		}
 
 		// verify the address
-		_, err := cipher.BitcoinDecodeBase58Address(addr)
-		if err != nil {
-			log.Printf("Invalid bitcoin address: %s, err:%v", addr, err)
-			continue
-		}
+		//_, err := cipher.BitcoinDecodeBase58Address(addr)
+		//if err != nil {
+		//	log.Printf("Invalid bitcoin address: %s, err:%v", addr, err)
+		//	continue
+		//}
 
 		if !usedAddrs.IsExsit(addr) {
 			btcAddr.addresses = append(btcAddr.addresses, addr)

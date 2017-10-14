@@ -139,7 +139,9 @@ func (pm PongMessage) Serialize() ([]byte, error) {
 // BindRequest request for binding skycoin address with a deposit address
 type BindRequest struct {
 	Base
-	SkyAddress string `json:"skycoin_address"`
+	SkyAddress   string `json:"skycoin_address"`
+	PlanCoinType string `json:"plan_coin_type"`
+	CoinType     string `json:"coin_type"`
 }
 
 // Type returns message type
@@ -156,6 +158,7 @@ func (br BindRequest) Serialize() ([]byte, error) {
 type BindResponse struct {
 	Base
 	BtcAddress string `json:"btc_address,omitempty"`
+	CoinType   string `json:"coin_type"`
 	Error      string `json:"error,omitempty"`
 }
 
@@ -172,7 +175,8 @@ func (br BindResponse) Serialize() ([]byte, error) {
 // StatusRequest request to get skycoin status
 type StatusRequest struct {
 	Base
-	SkyAddress string `json:"sky_address"`
+	SkyAddress string `json:"address"`
+	CoinType   string `json:"coin_type"`
 }
 
 // Type retusn message type
@@ -206,6 +210,7 @@ type DepositStatusDetail struct {
 type StatusResponse struct {
 	Base
 	Statuses []DepositStatus `json:"statuses,omitempty"`
+	CoinType string          `json:"coin_type"`
 	Error    string          `json:"error,omitempty"`
 }
 

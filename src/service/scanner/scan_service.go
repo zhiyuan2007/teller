@@ -9,7 +9,7 @@ package scanner
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	//"io/ioutil"
 	"sync"
 
 	"time"
@@ -33,6 +33,8 @@ const (
 type Btcrpcclient interface {
 	GetBestBlock() (*chainhash.Hash, int32, error)
 	GetBlockVerboseTx(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error)
+	GetBestBlockHash() (*chainhash.Hash, error)
+	GetBlockVerbose(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error)
 	Shutdown()
 }
 
@@ -137,6 +139,7 @@ func (scan *ScanService) Run() error {
 	if err != nil {
 		return fmt.Errorf("get last scan block failed: %v", err)
 	}
+	scan.Printf(" height %d---hash:%s----", height, hash)
 
 	var block *btcjson.GetBlockVerboseResult
 
@@ -145,6 +148,7 @@ func (scan *ScanService) Run() error {
 		// get the best block
 		block, err = scan.getBestBlock()
 		if err != nil {
+			scan.Println("- get best block-----------scan ----", err)
 			return err
 		}
 
@@ -271,7 +275,7 @@ func (scan *ScanService) AddScanAddress(addr string) error {
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
 func (scan *ScanService) getBestBlock() (*btcjson.GetBlockVerboseResult, error) {
-	hash, _, err := scan.btcrpcclt.GetBestBlock()
+	hash, err := scan.btcrpcclt.GetBestBlockHash()
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +285,8 @@ func (scan *ScanService) getBestBlock() (*btcjson.GetBlockVerboseResult, error) 
 
 // getBlock returns block of given hash
 func (scan *ScanService) getBlock(hash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
-	return scan.btcrpcclt.GetBlockVerboseTx(hash)
+	//return scan.btcrpcclt.GetBlockVerboseTx(hash)
+	return scan.btcrpcclt.GetBlockVerbose(hash)
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist
@@ -336,16 +341,18 @@ func (scan *ScanService) Shutdown() {
 // ConnectBTCD connects to the btcd rpcserver
 func ConnectBTCD(server, user, pass, certPath string) (*btcrpcclient.Client, error) {
 	// connect to the btcd
-	certs, err := ioutil.ReadFile(certPath)
-	if err != nil {
-		return nil, err
-	}
+	//certs, err := ioutil.ReadFile(certPath)
+	//if err != nil {
+	//	return nil, err
+	//}
 	connCfg := &btcrpcclient.ConnConfig{
-		Host:         server,
-		Endpoint:     "ws",
-		User:         user,
-		Pass:         pass,
-		Certificates: certs,
+		Host: server,
+		//Endpoint:     "ws",
+		User: user,
+		Pass: pass,
+		//Certificates: certs,
+		DisableTLS:   true,
+		HTTPPostMode: true,
 	}
 	return btcrpcclient.New(connCfg, nil)
 }
