@@ -273,7 +273,7 @@ func (s *BTCScanner) AddScanAddress(addr string) error {
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
 func (s *BTCScanner) getBestBlock() (*btcjson.GetBlockVerboseResult, error) {
-	hash, _, err := s.btcClient.GetBestBlock()
+	hash, err := s.btcClient.GetBestBlockHash()
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func (s *BTCScanner) getBestBlock() (*btcjson.GetBlockVerboseResult, error) {
 
 // getBlock returns block of given hash
 func (s *BTCScanner) getBlock(hash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
-	return s.btcClient.GetBlockVerboseTx(hash)
+	return s.btcClient.GetBlockVerbose(hash)
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist

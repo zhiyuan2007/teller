@@ -286,7 +286,7 @@ func main() {
 		fmt.Println("block hash:", hash.String())
 
 		for {
-			bv, err := btcrpcli.GetBlockVerboseTx(hash)
+			bv, err := btcrpcli.GetBlockVerbose(hash)
 			if err != nil {
 				fmt.Printf("Get block of %s failed: %v\n", hash, err)
 				return
