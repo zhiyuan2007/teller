@@ -242,7 +242,7 @@ func main() {
 
 		return
 	case "scanblock":
-		if len(args) != 6 {
+		if len(args) != 5 {
 			fmt.Println("Invalid arguments")
 			fmt.Println(usage)
 			return
@@ -250,26 +250,28 @@ func main() {
 		rpcserv := args[1]
 		rpcuser := args[2]
 		rpcpass := args[3]
-		rpccert := args[4]
-		v, err := ioutil.ReadFile(rpccert)
-		if err != nil {
-			fmt.Println("Read cert file failed:", err)
-			return
-		}
+		//rpccert := args[4]
+		//v, err := ioutil.ReadFile(rpccert)
+		//if err != nil {
+		//fmt.Println("Read cert file failed:", err)
+		//return
+		//}
 
+		fmt.Printf("host:%s,user:%s,pass:%s\n", rpcserv, rpcuser, rpcpass)
 		btcrpcli, err := btcrpcclient.New(&btcrpcclient.ConnConfig{
-			Host:         rpcserv,
-			Endpoint:     "ws",
+			Host: rpcserv,
+			//Endpoint:   "ws",
 			User:         rpcuser,
 			Pass:         rpcpass,
-			Certificates: v,
+			DisableTLS:   true,
+			HTTPPostMode: true,
 		}, nil)
 		if err != nil {
 			fmt.Println("Connect btcd failed:", err)
 			return
 		}
 
-		h := args[5]
+		h := args[4]
 		height, err := strconv.ParseInt(h, 10, 64)
 		if err != nil {
 			fmt.Println("Invalid block height")
@@ -281,6 +283,7 @@ func main() {
 			fmt.Println("Get block hash failed:", err)
 			return
 		}
+		fmt.Println("block hash:", hash.String())
 
 		for {
 			bv, err := btcrpcli.GetBlockVerboseTx(hash)

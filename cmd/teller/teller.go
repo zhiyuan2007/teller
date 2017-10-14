@@ -339,17 +339,20 @@ func run() error {
 }
 
 func makeBtcrpcConfg(cfg config.Config) btcrpcclient.ConnConfig {
-	certs, err := ioutil.ReadFile(cfg.Btcrpc.Cert)
-	if err != nil {
-		panic(fmt.Sprintf("btc rpc cert file does not exist in %s", cfg.Btcrpc.Cert))
-	}
+	//certs, err := ioutil.ReadFile(cfg.Btcrpc.Cert)
+	//if err != nil {
+	//	panic(fmt.Sprintf("btc rpc cert file does not exist in %s", cfg.Btcrpc.Cert))
+	//}
 
 	return btcrpcclient.ConnConfig{
-		Endpoint:     "ws",
+		//Endpoint:     "ws",
 		Host:         cfg.Btcrpc.Server,
 		User:         cfg.Btcrpc.User,
 		Pass:         cfg.Btcrpc.Pass,
-		Certificates: certs,
+		DisableTLS:   true,
+		HTTPPostMode: true,
+
+		//Certificates: certs,
 	}
 }
 

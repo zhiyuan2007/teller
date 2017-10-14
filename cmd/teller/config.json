@@ -9,18 +9,24 @@
     "session_write_bufer_size": 100,
     "monitor_address": "127.0.0.1:7711",
     "skynode": {
-        "rpc_address": "127.0.0.1:6430",
-        "wallet_path": "absolute path to the wallet file"
+        "rpc_address": "127.0.0.1:8431",
+        "wallet_path": "/Users/liuguirong/.samoscoin/wallets/origin1.wlt"
     },
     "btc_scan": {
         "check_period": 20,
         "deposit_buffer_size": 1024
     },
+    "btc11_rpc": {
+        "server": "118.190.40.103:18332",
+        "user": "RPCuser",
+        "pass": "RPCpasswd",
+        "cert": "/Users/liuguirong/project/data/zebra/zebra.conf"
+    },
     "btc_rpc": {
-        "server": "127.0.0.1:8334",
-        "user": "",
-        "pass": "",
-        "cert": "absolute path to rpc cert file"
+        "server": "127.0.0.1:8822",
+        "user": "zoinrpc",
+        "pass": "de86929b1dfdf1371826bcf6c57782fa",
+        "cert": "/Users/liuguirong/project/data/zebra/zebra.conf"
     },
     "sky_sender": {
         "request_buffer_size": 1024
