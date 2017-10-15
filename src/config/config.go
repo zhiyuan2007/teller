@@ -20,7 +20,8 @@ type Config struct {
 	MaxBind     int    `json:"max_bind"`        // max number of btc addresses a skycoin address can bind
 	MonitorAddr string `json:"monitor_address"` // monitor service address
 
-	Skynode Skynode `json:"skynode"`
+	Skynode   Skynode `json:"skynode"`
+	Samosnode Skynode `json:"samosnode"`
 
 	ExchangeRate int64 `json:"exchange_rate"`
 

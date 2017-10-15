@@ -6,6 +6,7 @@ import (
 	"github.com/skycoin/skycoin/src/api/cli"
 	"github.com/skycoin/skycoin/src/api/webrpc"
 	"github.com/skycoin/skycoin/src/cipher"
+	"github.com/skycoin/skycoin/src/visor"
 	"github.com/skycoin/skycoin/src/wallet"
 )
 
@@ -60,4 +61,37 @@ func (c *RPC) Send(recvAddr string, amount uint64) (string, error) {
 // GetTransaction returns transaction by txid
 func (c *RPC) GetTransaction(txid string) (*webrpc.TxnResult, error) {
 	return c.rpcClient.GetTransactionByID(txid)
+}
+
+func (c *RPC) GetBlocks(start, end uint64) (*visor.ReadableBlocks, error) {
+	param := []uint64{start, end}
+	blocks := visor.ReadableBlocks{}
+
+	if err := c.rpcClient.Do(&blocks, "get_blocks", param); err != nil {
+		return nil, err
+	}
+
+	return &blocks, nil
+}
+
+func (c *RPC) GetBlocksBySeq(ss []uint64) (*visor.ReadableBlocks, error) {
+	blocks := visor.ReadableBlocks{}
+
+	if err := c.rpcClient.Do(&blocks, "get_blocks_by_seq", ss); err != nil {
+		return nil, err
+	}
+
+	return &blocks, nil
+}
+
+func (c *RPC) GetLastBlocks(n uint64) (*visor.ReadableBlocks, error) {
+	param := []uint64{n}
+	blocks := visor.ReadableBlocks{}
+	if err := c.rpcClient.Do(&blocks, "get_lastblocks", param); err != nil {
+		return nil, err
+	}
+
+	return &blocks, nil
+}
+func (c *RPC) Shutdown() {
 }

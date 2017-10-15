@@ -12,24 +12,26 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcutil"
 	"github.com/sirupsen/logrus"
+	"github.com/skycoin/skycoin/src/api/webrpc"
+	"github.com/skycoin/skycoin/src/visor"
+	"github.com/skycoin/teller/src/sender"
+	"strconv"
 )
 
 // SKYScanner blockchain scanner to check if there're deposit coins
 type SKYScanner struct {
 	log       logrus.FieldLogger
 	cfg       Config
-	btcClient BtcRPCClient
+	skyClient *sender.RPC
 	store     *store
 	depositC  chan DepositNote // deposit value channel
 	quit      chan struct{}
 }
 
 // NewSKYScanner creates scanner instance
-func NewSKYScanner(log logrus.FieldLogger, db *bolt.DB, btc BtcRPCClient, cfg Config) (*SKYScanner, error) {
+func NewSKYScanner(log logrus.FieldLogger, db *bolt.DB, rpc *sender.RPC, cfg Config) (*SKYScanner, error) {
 	s, err := newStore(db)
 	if err != nil {
 		return nil, err
@@ -40,7 +42,7 @@ func NewSKYScanner(log logrus.FieldLogger, db *bolt.DB, btc BtcRPCClient, cfg Co
 	}
 
 	return &SKYScanner{
-		btcClient: btc,
+		skyClient: rpc,
 		log:       log.WithField("prefix", "scanner.btc"),
 		cfg:       cfg,
 		store:     s,
@@ -52,8 +54,8 @@ func NewSKYScanner(log logrus.FieldLogger, db *bolt.DB, btc BtcRPCClient, cfg Co
 // Run starts the scanner
 func (s *SKYScanner) Run() error {
 	log := s.log
-	log.Info("Start bitcoin blockchain scan service")
-	defer log.Info("Bitcoin blockchain scan service closed")
+	log.Info("Start skycoin blockchain scan service")
+	defer log.Info("Skycoin blockchain scan service closed")
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -110,6 +112,7 @@ func (s *SKYScanner) Run() error {
 		"blockHash":   hash,
 	})
 
+	seq := uint64(1)
 	if height == 0 {
 		// the first time the bot start
 		// get the best block
@@ -119,10 +122,11 @@ func (s *SKYScanner) Run() error {
 		}
 
 		if err := s.scanBlock(block); err != nil {
-			return fmt.Errorf("Scan block %s failed: %v", block.Hash, err)
+			return fmt.Errorf("Scan block %s failed: %v", block.Head.BlockHash, err)
 		}
 
-		hash = block.Hash
+		hash = block.Head.BlockHash
+		seq = block.Head.BkSeq
 		log = log.WithField("blockHash", hash)
 	}
 
@@ -132,7 +136,7 @@ func (s *SKYScanner) Run() error {
 		defer wg.Done()
 
 		for {
-			nextBlock, err := s.getNextBlock(hash)
+			nextBlock, err := s.getNextBlock(seq)
 			if err != nil {
 				log.WithError(err).Error("getNextBlock failed")
 				select {
@@ -154,8 +158,8 @@ func (s *SKYScanner) Run() error {
 				}
 			}
 
-			hash = nextBlock.Hash
-			height = nextBlock.Height
+			hash = nextBlock.Head.BlockHash
+			height = int64(nextBlock.Head.BkSeq)
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
@@ -167,7 +171,7 @@ func (s *SKYScanner) Run() error {
 				case <-s.quit:
 					return
 				default:
-					errC <- fmt.Errorf("Scan block %s failed: %v", nextBlock.Hash, err)
+					errC <- fmt.Errorf("Scan block %s failed: %v", nextBlock.Head.BlockHash, err)
 					return
 				}
 			}
@@ -188,7 +192,7 @@ func (s *SKYScanner) Run() error {
 	}
 }
 
-func (s *SKYScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
+func (s *SKYScanner) scanBlock(block *visor.ReadableBlock) error {
 	return s.store.db.Update(func(tx *bolt.Tx) error {
 		addrs, err := s.store.getScanAddressesTx(tx)
 		if err != nil {
@@ -211,53 +215,48 @@ func (s *SKYScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
 			}
 		}
 
-		hash, err := chainhash.NewHashFromStr(block.Hash)
-		if err != nil {
-			return err
-		}
-
 		return s.store.setLastScanBlockTx(tx, LastScanBlock{
-			Hash:   hash.String(),
-			Height: block.Height,
+			Hash:   block.Head.BlockHash,
+			Height: int64(block.Head.BkSeq),
 		})
 	})
 }
 
 // scanSKYBlock scan the given block and returns the next block hash or error
-func scanSKYBlock(s *SKYScanner, block *btcjson.GetBlockVerboseResult, depositAddrs []string) ([]DepositValue, error) {
+func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []string) ([]DepositValue, error) {
 	addrMap := map[string]struct{}{}
 	for _, a := range depositAddrs {
 		addrMap[a] = struct{}{}
 	}
 
 	var dv []DepositValue
-	for _, txidstr := range block.Tx {
-		txid, err := chainhash.NewHashFromStr(txidstr)
-		if err != nil {
-			fmt.Printf("new hash from str failed id: %s\n", txidstr)
-			continue
-		}
-		tx, err := s.getRawTransactionVerbose(txid)
-		if err != nil {
-			fmt.Printf("get getRawTransactionVerbose failed: %s\n", txidstr)
-			continue
-		}
-		for _, v := range tx.Vout {
-			amt, err := btcutil.NewAmount(v.Value)
-			if err != nil {
-				return nil, err
+	for _, tx := range block.Body.Transactions {
+		//txid, err := chainhash.NewHashFromStr(txidstr)
+		//if err != nil {
+		//	fmt.Printf("new hash from str failed id: %s\n", txidstr)
+		//	continue
+		//}
+		//tx, err := s.getRawTransactionVerbose(txid)
+		//if err != nil {
+		//	fmt.Printf("get getRawTransactionVerbose failed: %s\n", txidstr)
+		//	continue
+		//}
+		for i, v := range tx.Out {
+			amt, ee := strconv.Atoi(v.Coins)
+			if ee != nil {
+				fmt.Printf("------wrong coin value %s\n-----", v.Coins)
+				continue
 			}
 
-			for _, a := range v.ScriptPubKey.Addresses {
-				if _, ok := addrMap[a]; ok {
-					dv = append(dv, DepositValue{
-						Address: a,
-						Value:   int64(amt),
-						Height:  block.Height,
-						Tx:      tx.Txid,
-						N:       v.N,
-					})
-				}
+			a := v.Address
+			if _, ok := addrMap[a]; ok {
+				dv = append(dv, DepositValue{
+					Address: a,
+					Value:   int64(amt),
+					Height:  int64(block.Head.BkSeq),
+					Tx:      tx.Hash,
+					N:       uint32(i),
+				})
 			}
 		}
 	}
@@ -272,46 +271,32 @@ func (s *SKYScanner) AddScanAddress(addr string) error {
 
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
-func (s *SKYScanner) getBestBlock() (*btcjson.GetBlockVerboseResult, error) {
-	hash, err := s.btcClient.GetBestBlockHash()
+func (s *SKYScanner) getBestBlock() (*visor.ReadableBlock, error) {
+	rb, err := s.skyClient.GetLastBlocks(1)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.getBlock(hash)
+	return &rb.Blocks[0], err
 }
 
 // getBlock returns block of given hash
-func (s *SKYScanner) getBlock(hash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
-	return s.btcClient.GetBlockVerbose(hash)
+func (s *SKYScanner) getBlock(ss []uint64) (*visor.ReadableBlock, error) {
+	rb, err := s.skyClient.GetBlocksBySeq(ss)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rb.Blocks[0], err
 }
 
-func (s *SKYScanner) getRawTransactionVerbose(hash *chainhash.Hash) (*btcjson.TxRawResult, error) {
-	return s.btcClient.GetRawTransactionVerbose(hash)
+func (s *SKYScanner) getRawTransactionVerbose(hash string) (*webrpc.TxnResult, error) {
+	return s.skyClient.GetTransaction(hash)
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist
-func (s *SKYScanner) getNextBlock(hash string) (*btcjson.GetBlockVerboseResult, error) {
-	h, err := chainhash.NewHashFromStr(hash)
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := s.getBlock(h)
-	if err != nil {
-		return nil, err
-	}
-
-	if b.NextHash == "" {
-		return nil, nil
-	}
-
-	nxtHash, err := chainhash.NewHashFromStr(b.NextHash)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.getBlock(nxtHash)
+func (s *SKYScanner) getNextBlock(ss uint64) (*visor.ReadableBlock, error) {
+	return s.getBlock([]uint64{ss})
 }
 
 // setLastScanBlock sets the last scan block hash and height
@@ -341,5 +326,5 @@ func (s *SKYScanner) GetDepositValue() <-chan DepositNote {
 func (s *SKYScanner) Shutdown() {
 	s.log.Info("Closing SKY scanner")
 	close(s.quit)
-	s.btcClient.Shutdown()
+	s.skyClient.Shutdown()
 }

@@ -221,6 +221,11 @@ func run() error {
 			log.WithError(err).Error("checkSkycoinSetup failed")
 			return err
 		}
+		// check samoscoin setup
+		if err := checkSamoscoinSetup(*cfg); err != nil {
+			log.WithError(err).Error("checkSamoscoinSetup failed")
+			return err
+		}
 
 		// create btc rpc client
 		btcrpcConnConf := makeBtcrpcConfg(*cfg)
@@ -229,13 +234,9 @@ func run() error {
 			log.WithError(err).Error("Connect btcd failed")
 			return err
 		}
-		skyrpc, err := btcrpcclient.New(&btcrpcConnConf, nil)
-		if err != nil {
-			log.WithError(err).Error("Connect skyd failed")
-			return err
-		}
-
 		log.Info("Connect to btcd success")
+		skyrpc := sender.NewRPC(cfg.Skynode.WalletPath, cfg.Skynode.RPCAddress)
+		log.Info("Connect to skycoind success")
 
 		// create scan service
 		btcScanner, err = scanner.NewBTCScanner(log, db, btcrpc, scanner.Config{
@@ -259,10 +260,10 @@ func run() error {
 
 		background("skyScanner.Run", errC, skyScanner.Run)
 
-		skyRPC := sender.NewRPC(cfg.Skynode.WalletPath, cfg.Skynode.RPCAddress)
+		samosRPC := sender.NewRPC(cfg.Samosnode.WalletPath, cfg.Samosnode.RPCAddress)
 
 		// create skycoin send service
-		sendService = sender.NewService(makeSendConfig(*cfg), log, skyRPC)
+		sendService = sender.NewService(makeSendConfig(*cfg), log, samosRPC)
 
 		background("sendService.Run", errC, sendService.Run)
 
@@ -426,6 +427,24 @@ func checkSkycoinSetup(cfg config.Config) error {
 	conn, err := net.Dial("tcp", cfg.Skynode.RPCAddress)
 	if err != nil {
 		return fmt.Errorf("connect to skycoin node %s failed: %v", cfg.Skynode.RPCAddress, err)
+	}
+
+	conn.Close()
+
+	return nil
+}
+
+// checks skycoin setups
+func checkSamoscoinSetup(cfg config.Config) error {
+	// check whether the skycoin wallet file does exist
+	if _, err := os.Stat(cfg.Samosnode.WalletPath); os.IsNotExist(err) {
+		return fmt.Errorf("samoscoin wallet file: %s does not exist", cfg.Samosnode.WalletPath)
+	}
+
+	// test if skycoin node rpc service is reachable
+	conn, err := net.Dial("tcp", cfg.Samosnode.RPCAddress)
+	if err != nil {
+		return fmt.Errorf("connect to samoscoin node %s failed: %v", cfg.Samosnode.RPCAddress, err)
 	}
 
 	conn.Close()
