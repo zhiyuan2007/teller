@@ -335,13 +335,32 @@ func (hs *httpServer) Shutdown() {
 	hs.quit = nil
 }
 
+// UnifiedResonse for all reponse format
+type UnifiedResponse struct {
+	Errmsg string      `json:"errmsg"`
+	Code   int         `json:"code"`
+	Data   interface{} `json:"data"`
+	// Error      string `json:"error,omitempty"`
+}
+
 // BindResponse http response for /api/bind
 type BindResponse struct {
-	BtcAddress string `json:"btc_address,omitempty"`
+	BtcAddress string `json:"address,omitempty"`
+	CoinType   string `json:"coin_type"`
 }
 
 type bindRequest struct {
-	SkyAddr string `json:"skyaddr"`
+	SkyAddr      string `json:"address"`
+	PlanCoinType string `json:"plan_coin_type"`
+	CoinType     string `json:"coin_type"`
+}
+
+func makeUnifiedHTTPResponse(code int, data interface{}, errmsg string) UnifiedResponse {
+	return UnifiedResponse{
+		Code:   code,
+		Data:   data,
+		Errmsg: errmsg,
+	}
 }
 
 // BindHandler binds skycoin address with a bitcoin address
@@ -384,6 +403,15 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 			return
 		}
 
+		if bindReq.PlanCoinType == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing plan_coin_type"))
+			return
+		}
+		if bindReq.CoinType == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing coin_type"))
+			return
+		}
+
 		log.Info()
 
 		if !verifySkycoinAddress(ctx, w, bindReq.SkyAddr) {
@@ -410,9 +438,10 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 
 		log.Info("Bound sky and btc addresses")
 
-		if err := httputil.JSONResponse(w, BindResponse{
-			BtcAddress: btcAddr,
-		}); err != nil {
+		tmp := BindResponse{BtcAddress: btcAddr, CoinType: bindReq.CoinType}
+		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
+
+		if err := httputil.JSONResponse(w, unifiedres); err != nil {
 			log.WithError(err).Error()
 		}
 	}
@@ -440,6 +469,11 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 		skyAddr := r.URL.Query().Get("skyaddr")
 		if skyAddr == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing skyaddr"))
+			return
+		}
+		coinType := r.URL.Query().Get("coin_type")
+		if coinType == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing coin_type"))
 			return
 		}
 
@@ -476,9 +510,9 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 
 		log.Info("Got depositStatuses")
 
-		if err := httputil.JSONResponse(w, StatusResponse{
-			Statuses: depositStatuses,
-		}); err != nil {
+		tmp := StatusResponse{Statuses: depositStatuses}
+		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
+		if err := httputil.JSONResponse(w, unifiedres); err != nil {
 			log.WithError(err).Error()
 		}
 	}
@@ -542,5 +576,8 @@ func errorResponse(ctx context.Context, w http.ResponseWriter, code int, err err
 		"statusMsg": http.StatusText(code),
 	}).WithError(err).Info()
 
-	httputil.ErrResponse(w, code)
+	unifiedres := makeUnifiedHTTPResponse(code, "", err.Error())
+	httputil.JSONResponse(w, unifiedres)
+
+	//httputil.ErrResponse(w, code)
 }

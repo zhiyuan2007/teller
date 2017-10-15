@@ -23,6 +23,7 @@ type BtcRPCClient interface {
 	GetBlockVerboseTx(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error)
 	GetBestBlockHash() (*chainhash.Hash, error)
 	GetBlockVerbose(blockHash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error)
+	GetRawTransactionVerbose(txHash *chainhash.Hash) (*btcjson.TxRawResult, error)
 	Shutdown()
 }
 

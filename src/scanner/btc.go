@@ -205,7 +205,7 @@ func (s *BTCScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
 			return err
 		}
 
-		dvs, err := scanBTCBlock(block, addrs)
+		dvs, err := scanBTCBlock(s, block, addrs)
 		if err != nil {
 			return err
 		}
@@ -234,14 +234,24 @@ func (s *BTCScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
 }
 
 // scanBTCBlock scan the given block and returns the next block hash or error
-func scanBTCBlock(block *btcjson.GetBlockVerboseResult, depositAddrs []string) ([]DepositValue, error) {
+func scanBTCBlock(s *BTCScanner, block *btcjson.GetBlockVerboseResult, depositAddrs []string) ([]DepositValue, error) {
 	addrMap := map[string]struct{}{}
 	for _, a := range depositAddrs {
 		addrMap[a] = struct{}{}
 	}
 
 	var dv []DepositValue
-	for _, tx := range block.RawTx {
+	for _, txidstr := range block.Tx {
+		txid, err := chainhash.NewHashFromStr(txidstr)
+		if err != nil {
+			fmt.Printf("new hash from str failed id: %s\n", txidstr)
+			continue
+		}
+		tx, err := s.getRawTransactionVerbose(txid)
+		if err != nil {
+			fmt.Printf("get getRawTransactionVerbose failed: %s\n", txidstr)
+			continue
+		}
 		for _, v := range tx.Vout {
 			amt, err := btcutil.NewAmount(v.Value)
 			if err != nil {
@@ -284,6 +294,10 @@ func (s *BTCScanner) getBestBlock() (*btcjson.GetBlockVerboseResult, error) {
 // getBlock returns block of given hash
 func (s *BTCScanner) getBlock(hash *chainhash.Hash) (*btcjson.GetBlockVerboseResult, error) {
 	return s.btcClient.GetBlockVerbose(hash)
+}
+
+func (s *BTCScanner) getRawTransactionVerbose(hash *chainhash.Hash) (*btcjson.TxRawResult, error) {
+	return s.btcClient.GetRawTransactionVerbose(hash)
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist
