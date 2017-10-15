@@ -67,12 +67,13 @@ func calculateSkyValue(satoshis, skyPerBTC int64) (uint64, error) {
 
 // Service manages coin exchange between deposits and skycoin
 type Service struct {
-	log     logrus.FieldLogger
-	cfg     Config
-	scanner BtcScanner // scanner provides apis for interacting with scan service
-	sender  SkySender  // sender provides apis for sending skycoin
-	store   *store     // deposit info storage
-	quit    chan struct{}
+	log        logrus.FieldLogger
+	cfg        Config
+	scanner    BtcScanner // scanner provides apis for interacting with scan service
+	skyScanner BtcScanner // scanner provides apis for interacting with scan service
+	sender     SkySender  // sender provides apis for sending skycoin
+	store      *store     // deposit info storage
+	quit       chan struct{}
 }
 
 // Config exchange config struct
@@ -81,19 +82,21 @@ type Config struct {
 }
 
 // NewService creates exchange service
-func NewService(log logrus.FieldLogger, db *bolt.DB, scanner BtcScanner, sender SkySender, cfg Config) *Service {
+func NewService(log logrus.FieldLogger, db *bolt.DB, scanner, skyScanner BtcScanner, sender SkySender, cfg Config) *Service {
 	s, err := newStore(db, log)
 	if err != nil {
 		panic(err)
 	}
 
 	return &Service{
-		cfg:     cfg,
-		log:     log.WithField("prefix", "teller.exchange"),
-		scanner: scanner,
-		sender:  sender,
-		store:   s,
-		quit:    make(chan struct{}),
+		cfg:        cfg,
+		log:        log.WithField("prefix", "teller.exchange"),
+		scanner:    scanner,
+		skyScanner: skyScanner,
+
+		sender: sender,
+		store:  s,
+		quit:   make(chan struct{}),
 	}
 }
 

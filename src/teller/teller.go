@@ -43,7 +43,7 @@ type Teller struct {
 }
 
 // New creates a Teller
-func New(log logrus.FieldLogger, exchanger Exchanger, btcAddrGen BtcAddrGenerator, cfg Config) (*Teller, error) {
+func New(log logrus.FieldLogger, exchanger Exchanger, btcAddrGen, skyAddrGen BtcAddrGenerator, cfg Config) (*Teller, error) {
 	if err := cfg.HTTP.Validate(); err != nil {
 		return nil, err
 	}
@@ -56,6 +56,7 @@ func New(log logrus.FieldLogger, exchanger Exchanger, btcAddrGen BtcAddrGenerato
 			cfg:        cfg.Service,
 			exchanger:  exchanger,
 			btcAddrGen: btcAddrGen,
+			skyAddrGen: skyAddrGen,
 		}),
 	}, nil
 }
@@ -94,13 +95,14 @@ type service struct {
 	cfg        ServiceConfig
 	exchanger  Exchanger        // exchange Teller client
 	btcAddrGen BtcAddrGenerator // btc address generator
+	skyAddrGen BtcAddrGenerator // zebra address generator
 }
 
 // BindAddress binds skycoin address with a deposit btc address
 // return btc address
-func (s *service) BindAddress(skyAddr string) (string, error) {
+func (s *service) BindAddress(samosAddr, coinType string) (string, error) {
 	if s.cfg.MaxBind != 0 {
-		num, err := s.exchanger.BindNum(skyAddr)
+		num, err := s.exchanger.BindNum(samosAddr)
 		if err != nil {
 			return "", err
 		}
@@ -110,19 +112,43 @@ func (s *service) BindAddress(skyAddr string) (string, error) {
 		}
 	}
 
-	btcAddr, err := s.btcAddrGen.NewAddress()
-	if err != nil {
-		return "", err
+	switch coinType {
+	case "bitcoin":
+		btcAddr, err := s.btcAddrGen.NewAddress()
+		if err != nil {
+			return "", err
+		}
+
+		if err := s.exchanger.BindAddress(btcAddr, samosAddr); err != nil {
+			return "", err
+		}
+
+		return btcAddr, nil
+	case "skycoin":
+		skyAddr, err := s.skyAddrGen.NewAddress()
+		if err != nil {
+			return "", err
+		}
+
+		if err := s.exchanger.BindAddress(skyAddr, samosAddr); err != nil {
+			return "", err
+		}
+
+		return skyAddr, nil
 	}
 
-	if err := s.exchanger.BindAddress(btcAddr, skyAddr); err != nil {
-		return "", err
-	}
+	return "", errors.New("not support cointype")
 
-	return btcAddr, nil
 }
 
 // GetDepositStatuses returns deposit status of given skycoin address
-func (s *service) GetDepositStatuses(skyAddr string) ([]exchange.DepositStatus, error) {
-	return s.exchanger.GetDepositStatuses(skyAddr)
+func (s *service) GetDepositStatuses(skyAddr, coinType string) ([]exchange.DepositStatus, error) {
+	switch coinType {
+	case "bitcoin":
+		return s.exchanger.GetDepositStatuses(skyAddr)
+	case "skycoin":
+		return s.exchanger.GetDepositStatuses(skyAddr)
+	}
+
+	return []exchange.DepositStatus{}, errors.New("not support cointype")
 }

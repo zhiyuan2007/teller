@@ -95,6 +95,7 @@ func main() {
 func run() error {
 	configFile := flag.String("cfg", "config.json", "config.json file")
 	btcAddrs := flag.String("btc-addrs", "btc_addresses.json", "btc_addresses.json file")
+	skyAddrs := flag.String("sky-addrs", "sky_addresses.json", "sky_addresses.json file")
 	debug := flag.Bool("debug", false, "debug mode will show more detail logs")
 	dummyMode := flag.Bool("dummy", false, "run without real btcd or skyd service")
 	profile := flag.Bool("prof", false, "start gops profiling tool")
@@ -204,6 +205,7 @@ func run() error {
 	}
 
 	var btcScanner scanner.Scanner
+	var skyScanner scanner.Scanner
 	var scanRPC exchange.BtcScanner
 	var sendService *sender.SendService
 	var sendRPC exchange.SkySender
@@ -211,6 +213,7 @@ func run() error {
 	if *dummyMode {
 		log.Info("btcd and skyd disabled, running in dummy mode")
 		btcScanner = &dummyBtcScanner{log: log}
+		skyScanner = &dummyBtcScanner{log: log}
 		sendRPC = &dummySkySender{log: log}
 	} else {
 		// check skycoin setup
@@ -224,6 +227,11 @@ func run() error {
 		btcrpc, err := btcrpcclient.New(&btcrpcConnConf, nil)
 		if err != nil {
 			log.WithError(err).Error("Connect btcd failed")
+			return err
+		}
+		skyrpc, err := btcrpcclient.New(&btcrpcConnConf, nil)
+		if err != nil {
+			log.WithError(err).Error("Connect skyd failed")
 			return err
 		}
 
@@ -240,6 +248,17 @@ func run() error {
 
 		background("btcScanner.Run", errC, btcScanner.Run)
 
+		// create scan service
+		skyScanner, err = scanner.NewSKYScanner(log, db, skyrpc, scanner.Config{
+			ScanPeriod: cfg.Btcscan.CheckPeriod,
+		})
+		if err != nil {
+			log.WithError(err).Error("Open scan service failed")
+			return err
+		}
+
+		background("skyScanner.Run", errC, skyScanner.Run)
+
 		skyRPC := sender.NewRPC(cfg.Skynode.WalletPath, cfg.Skynode.RPCAddress)
 
 		// create skycoin send service
@@ -251,7 +270,7 @@ func run() error {
 	}
 
 	// create exchange service
-	exchangeService := exchange.NewService(log, db, btcScanner, sendRPC, exchange.Config{
+	exchangeService := exchange.NewService(log, db, btcScanner, skyScanner, sendRPC, exchange.Config{
 		Rate: cfg.ExchangeRate,
 	})
 	background("exchangeService.Run", errC, exchangeService.Run)
@@ -270,8 +289,19 @@ func run() error {
 		log.WithError(err).Error("Create bitcoin deposit address manager failed")
 		return err
 	}
+	f, err = ioutil.ReadFile(*skyAddrs)
+	if err != nil {
+		log.WithError(err).Error("Load deposit skycoin address list failed")
+		return err
+	}
 
-	tellerServer, err := teller.New(log, exchangeClient, btcAddrMgr, teller.Config{
+	skyAddrMgr, err := addrs.NewSkyAddrs(log, db, bytes.NewReader(f))
+	if err != nil {
+		log.WithError(err).Error("Create skycoin deposit address manager failed")
+		return err
+	}
+
+	tellerServer, err := teller.New(log, exchangeClient, btcAddrMgr, skyAddrMgr, teller.Config{
 		Service: teller.ServiceConfig{
 			MaxBind: cfg.MaxBind,
 		},
@@ -289,7 +319,7 @@ func run() error {
 	monitorCfg := monitor.Config{
 		Addr: cfg.MonitorAddr,
 	}
-	monitorService := monitor.New(log, monitorCfg, btcAddrMgr, exchangeClient, scanRPC)
+	monitorService := monitor.New(log, monitorCfg, btcAddrMgr, skyAddrMgr, exchangeClient, scanRPC)
 
 	background("monitorService.Run", errC, monitorService.Run)
 

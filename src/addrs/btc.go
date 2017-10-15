@@ -8,7 +8,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/sirupsen/logrus"
-	//"github.com/skycoin/skycoin/src/cipher"
+	"github.com/skycoin/skycoin/src/cipher"
 )
 
 const btcBucketKey = "used_btc_address"
@@ -50,9 +50,9 @@ func verifyBTCAddresses(addrs []string) error {
 			return fmt.Errorf("Duplicate deposit address `%s`", addr)
 		}
 
-		//if _, err := cipher.BitcoinDecodeBase58Address(addr); err != nil {
-		//	return fmt.Errorf("Invalid deposit address `%s`: %v", addr, err)
-		//}
+		if _, err := cipher.BitcoinDecodeBase58Address(addr); err != nil {
+			return fmt.Errorf("Invalid deposit address `%s`: %v", addr, err)
+		}
 
 		addrMap[addr] = struct{}{}
 	}

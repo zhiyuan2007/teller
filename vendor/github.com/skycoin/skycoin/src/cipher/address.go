@@ -78,6 +78,15 @@ func BitcoinDecodeBase58Address(addr string) (Address, error) {
 	return BitcoinAddressFromBytes(b)
 }
 
+// ZebracoinDecodeBase58Address decode bitcoin address from string
+func ZebracoinDecodeBase58Address(addr string) (Address, error) {
+	b, err := base58.Base582Hex(addr)
+	if err != nil {
+		return Address{}, err
+	}
+	return ZebracoinAddressFromBytes(b)
+}
+
 // BitcoinMustDecodeBase58Address must decodes bitcoin address from string
 func BitcoinMustDecodeBase58Address(addr string) Address {
 	a, err := BitcoinDecodeBase58Address(addr)
@@ -217,7 +226,30 @@ func BitcoinAddressFromBytes(b []byte) (Address, error) {
 	a := Address{}
 	copy(a.Key[0:20], b[1:21])
 	a.Version = b[0]
-	if a.Version != 0 {
+	//if a.Version != 0 {
+	//	return Address{}, errors.New("Invalid version")
+	//}
+
+	chksum := a.BitcoinChecksum()
+	var checksum [4]byte
+	copy(checksum[0:4], b[21:25])
+
+	if checksum != chksum {
+		return Address{}, errors.New("Invalid checksum")
+	}
+
+	return a, nil
+}
+
+// ZebracoinAddressFromBytes Returns an address given an Address.Bytes()
+func ZebracoinAddressFromBytes(b []byte) (Address, error) {
+	if len(b) != 20+1+4 {
+		return Address{}, errors.New("Invalid address length")
+	}
+	a := Address{}
+	copy(a.Key[0:20], b[1:21])
+	a.Version = b[0]
+	if a.Version != 80 {
 		return Address{}, errors.New("Invalid version")
 	}
 

@@ -368,7 +368,7 @@ func makeUnifiedHTTPResponse(code int, data interface{}, errmsg string) UnifiedR
 // Accept: application/json
 // URI: /api/bind
 // Args:
-//    {"skyaddr": "..."}
+//    {"address": "..."}
 func BindHandler(hs *httpServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -424,7 +424,7 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 
 		log.Info("Calling service.BindAddress")
 
-		btcAddr, err := hs.service.BindAddress(bindReq.SkyAddr)
+		btcAddr, err := hs.service.BindAddress(bindReq.SkyAddr, bindReq.CoinType)
 		if err != nil {
 			// TODO -- these could be internal server error, gateway error
 			log.WithError(err).Error("service.BindAddress failed")
@@ -466,7 +466,7 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 			return
 		}
 
-		skyAddr := r.URL.Query().Get("skyaddr")
+		skyAddr := r.URL.Query().Get("address")
 		if skyAddr == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing skyaddr"))
 			return
@@ -493,7 +493,7 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 
 		log.Info("Sending StatusRequest to teller")
 
-		depositStatuses, err := hs.service.GetDepositStatuses(skyAddr)
+		depositStatuses, err := hs.service.GetDepositStatuses(skyAddr, coinType)
 		if err != nil {
 			// TODO -- these could be internal server error, gateway error
 			log.WithError(err).Error("service.GetDepositStatuses failed")
