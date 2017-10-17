@@ -74,24 +74,33 @@ func (c *RPC) GetBlocks(start, end uint64) (*visor.ReadableBlocks, error) {
 	return &blocks, nil
 }
 
-func (c *RPC) GetBlocksBySeq(ss []uint64) (*visor.ReadableBlocks, error) {
+func (c *RPC) GetBlocksBySeq(seq uint64) (*visor.ReadableBlock, error) {
+
+	ss := []uint64{seq}
 	blocks := visor.ReadableBlocks{}
 
 	if err := c.rpcClient.Do(&blocks, "get_blocks_by_seq", ss); err != nil {
 		return nil, err
 	}
 
-	return &blocks, nil
+	if len(blocks.Blocks) == 0 {
+		return nil, nil
+	}
+
+	return &blocks.Blocks[0], nil
 }
 
-func (c *RPC) GetLastBlocks(n uint64) (*visor.ReadableBlocks, error) {
-	param := []uint64{n}
+func (c *RPC) GetLastBlocks() (*visor.ReadableBlock, error) {
+	param := []uint64{1}
 	blocks := visor.ReadableBlocks{}
 	if err := c.rpcClient.Do(&blocks, "get_lastblocks", param); err != nil {
 		return nil, err
 	}
 
-	return &blocks, nil
+	if len(blocks.Blocks) == 0 {
+		return nil, nil
+	}
+	return &blocks.Blocks[0], nil
 }
 func (c *RPC) Shutdown() {
 }

@@ -112,7 +112,7 @@ func (s *SKYScanner) Run() error {
 		"blockHash":   hash,
 	})
 
-	seq := uint64(1)
+	seq := height
 	if height == 0 {
 		// the first time the bot start
 		// get the best block
@@ -126,7 +126,7 @@ func (s *SKYScanner) Run() error {
 		}
 
 		hash = block.Head.BlockHash
-		seq = block.Head.BkSeq
+		seq = int64(block.Head.BkSeq)
 		log = log.WithField("blockHash", hash)
 	}
 
@@ -136,7 +136,7 @@ func (s *SKYScanner) Run() error {
 		defer wg.Done()
 
 		for {
-			nextBlock, err := s.getNextBlock(seq)
+			nextBlock, err := s.getNextBlock(uint64(seq))
 			if err != nil {
 				log.WithError(err).Error("getNextBlock failed")
 				select {
@@ -231,16 +231,6 @@ func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []stri
 
 	var dv []DepositValue
 	for _, tx := range block.Body.Transactions {
-		//txid, err := chainhash.NewHashFromStr(txidstr)
-		//if err != nil {
-		//	fmt.Printf("new hash from str failed id: %s\n", txidstr)
-		//	continue
-		//}
-		//tx, err := s.getRawTransactionVerbose(txid)
-		//if err != nil {
-		//	fmt.Printf("get getRawTransactionVerbose failed: %s\n", txidstr)
-		//	continue
-		//}
 		for i, v := range tx.Out {
 			amt, ee := strconv.Atoi(v.Coins)
 			if ee != nil {
@@ -272,22 +262,22 @@ func (s *SKYScanner) AddScanAddress(addr string) error {
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
 func (s *SKYScanner) getBestBlock() (*visor.ReadableBlock, error) {
-	rb, err := s.skyClient.GetLastBlocks(1)
+	rb, err := s.skyClient.GetLastBlocks()
 	if err != nil {
 		return nil, err
 	}
 
-	return &rb.Blocks[0], err
+	return rb, err
 }
 
 // getBlock returns block of given hash
-func (s *SKYScanner) getBlock(ss []uint64) (*visor.ReadableBlock, error) {
-	rb, err := s.skyClient.GetBlocksBySeq(ss)
+func (s *SKYScanner) getBlock(seq uint64) (*visor.ReadableBlock, error) {
+	rb, err := s.skyClient.GetBlocksBySeq(seq)
 	if err != nil {
 		return nil, err
 	}
 
-	return &rb.Blocks[0], err
+	return rb, err
 }
 
 func (s *SKYScanner) getRawTransactionVerbose(hash string) (*webrpc.TxnResult, error) {
@@ -295,8 +285,8 @@ func (s *SKYScanner) getRawTransactionVerbose(hash string) (*webrpc.TxnResult, e
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist
-func (s *SKYScanner) getNextBlock(ss uint64) (*visor.ReadableBlock, error) {
-	return s.getBlock([]uint64{ss})
+func (s *SKYScanner) getNextBlock(seq uint64) (*visor.ReadableBlock, error) {
+	return s.getBlock(seq + 1)
 }
 
 // setLastScanBlock sets the last scan block hash and height
