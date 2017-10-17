@@ -138,6 +138,7 @@ func run() error {
 
 	// load config
 	cfg, err := config.New(*configFile)
+	cfg.CoinTypes = []string{"bitcoin", "skycoin"}
 	if err != nil {
 		log.WithError(err).Error("Load config failed")
 		return err
@@ -241,6 +242,7 @@ func run() error {
 		// create scan service
 		btcScanner, err = scanner.NewBTCScanner(log, db, btcrpc, scanner.Config{
 			ScanPeriod: cfg.Btcscan.CheckPeriod,
+			CoinTypes:  cfg.CoinTypes,
 		})
 		if err != nil {
 			log.WithError(err).Error("Open scan service failed")
@@ -252,6 +254,7 @@ func run() error {
 		// create scan service
 		skyScanner, err = scanner.NewSKYScanner(log, db, skyrpc, scanner.Config{
 			ScanPeriod: cfg.Btcscan.CheckPeriod,
+			CoinTypes:  cfg.CoinTypes,
 		})
 		if err != nil {
 			log.WithError(err).Error("Open scan service failed")

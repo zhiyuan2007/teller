@@ -54,23 +54,22 @@ type store struct {
 	db *bolt.DB
 }
 
-func newStore(db *bolt.DB) (*store, error) {
+func newStore(db *bolt.DB, ct string) (*store, error) {
 	if db == nil {
 		return nil, errors.New("new store failed: db is nil")
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
 		// create LastScanBlock bucket if not exist
-		if _, err := tx.CreateBucketIfNotExists(scanMetaBkt); err != nil {
+		if _, err := tx.CreateBucketIfNotExists(dbutil.ByteJoin(scanMetaBkt, ct, "_")); err != nil {
 			return err
 		}
-
 		_, err := tx.CreateBucketIfNotExists(depositValueBkt)
 		return err
+
 	}); err != nil {
 		return nil, err
 	}
-
 	return &store{
 		db: db,
 	}, nil
@@ -83,11 +82,12 @@ type LastScanBlock struct {
 }
 
 // getLastScanBlock returns the last scanned block hash and height
-func (s *store) getLastScanBlock() (LastScanBlock, error) {
+func (s *store) getLastScanBlock(ct string) (LastScanBlock, error) {
 	var lsb LastScanBlock
 
 	if err := s.db.View(func(tx *bolt.Tx) error {
-		return dbutil.GetBucketObject(tx, scanMetaBkt, lastScanBlockKey, &lsb)
+		scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+		return dbutil.GetBucketObject(tx, scanMetaFullName, lastScanBlockKey, &lsb)
 	}); err != nil {
 		switch err.(type) {
 		case dbutil.ObjectNotExistErr:
@@ -100,20 +100,23 @@ func (s *store) getLastScanBlock() (LastScanBlock, error) {
 	return lsb, nil
 }
 
-func (s *store) setLastScanBlock(lsb LastScanBlock) error {
+func (s *store) setLastScanBlock(lsb LastScanBlock, ct string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		return dbutil.PutBucketValue(tx, scanMetaBkt, lastScanBlockKey, lsb)
+		scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+		return dbutil.PutBucketValue(tx, scanMetaFullName, lastScanBlockKey, lsb)
 	})
 }
 
-func (s *store) setLastScanBlockTx(tx *bolt.Tx, lsb LastScanBlock) error {
-	return dbutil.PutBucketValue(tx, scanMetaBkt, lastScanBlockKey, lsb)
+func (s *store) setLastScanBlockTx(tx *bolt.Tx, lsb LastScanBlock, ct string) error {
+	scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+	return dbutil.PutBucketValue(tx, scanMetaFullName, lastScanBlockKey, lsb)
 }
 
-func (s *store) getScanAddressesTx(tx *bolt.Tx) ([]string, error) {
+func (s *store) getScanAddressesTx(tx *bolt.Tx, ct string) ([]string, error) {
 	var addrs []string
 
-	if err := dbutil.GetBucketObject(tx, scanMetaBkt, depositAddressesKey, &addrs); err != nil {
+	scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+	if err := dbutil.GetBucketObject(tx, scanMetaFullName, depositAddressesKey, &addrs); err != nil {
 		switch err.(type) {
 		case dbutil.ObjectNotExistErr:
 			err = nil
@@ -129,12 +132,12 @@ func (s *store) getScanAddressesTx(tx *bolt.Tx) ([]string, error) {
 	return addrs, nil
 }
 
-func (s *store) getScanAddresses() ([]string, error) {
+func (s *store) getScanAddresses(ct string) ([]string, error) {
 	var addrs []string
 
 	if err := s.db.View(func(tx *bolt.Tx) error {
 		var err error
-		addrs, err = s.getScanAddressesTx(tx)
+		addrs, err = s.getScanAddressesTx(tx, ct)
 		return err
 	}); err != nil {
 		return nil, err
@@ -143,9 +146,9 @@ func (s *store) getScanAddresses() ([]string, error) {
 	return addrs, nil
 }
 
-func (s *store) addScanAddress(addr string) error {
+func (s *store) addScanAddress(addr string, ct string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		addrs, err := s.getScanAddressesTx(tx)
+		addrs, err := s.getScanAddressesTx(tx, ct)
 		if err != nil {
 			return err
 		}
@@ -158,16 +161,17 @@ func (s *store) addScanAddress(addr string) error {
 
 		addrs = append(addrs, addr)
 
-		return dbutil.PutBucketValue(tx, scanMetaBkt, depositAddressesKey, addrs)
+		scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+		return dbutil.PutBucketValue(tx, scanMetaFullName, depositAddressesKey, addrs)
 	})
 }
 
-func (s *store) removeScanAddr(addr string) error {
+func (s *store) removeScanAddr(addr string, ct string) error {
 	// FIXME: This will be very slow with large number of scan addresses.
 	// FIXME: Save scan addresses differently
 
 	return s.db.Update(func(tx *bolt.Tx) error {
-		addrs, err := s.getScanAddressesTx(tx)
+		addrs, err := s.getScanAddressesTx(tx, ct)
 		if err != nil {
 			return err
 		}
@@ -186,15 +190,16 @@ func (s *store) removeScanAddr(addr string) error {
 		}
 
 		addrs = append(addrs[:idx], addrs[idx+1:]...)
-		return dbutil.PutBucketValue(tx, scanMetaBkt, depositAddressesKey, addrs)
+		scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+		return dbutil.PutBucketValue(tx, scanMetaFullName, depositAddressesKey, addrs)
 	})
 }
 
-func (s *store) getHeadDepositValue() (DepositValue, error) {
+func (s *store) getHeadDepositValue(ct string) (DepositValue, error) {
 	var dv DepositValue
 
 	if err := s.db.View(func(tx *bolt.Tx) error {
-		index, err := s.getDepositValueIndexTx(tx)
+		index, err := s.getDepositValueIndexTx(tx, ct)
 		if err != nil {
 			return err
 		}
@@ -213,7 +218,7 @@ func (s *store) getHeadDepositValue() (DepositValue, error) {
 	return dv, nil
 }
 
-func (s *store) pushDepositValueTx(tx *bolt.Tx, dv DepositValue) error {
+func (s *store) pushDepositValueTx(tx *bolt.Tx, dv DepositValue, ct string) error {
 	key := dv.TxN()
 
 	// Check if the deposit value already exists
@@ -229,21 +234,22 @@ func (s *store) pushDepositValueTx(tx *bolt.Tx, dv DepositValue) error {
 	}
 
 	// Update deposit value index
-	index, err := s.getDepositValueIndexTx(tx)
+	index, err := s.getDepositValueIndexTx(tx, ct)
 	if err != nil {
 		return err
 	}
 
 	index = append(index, key)
 
-	return dbutil.PutBucketValue(tx, scanMetaBkt, dvIndexListKey, index)
+	scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+	return dbutil.PutBucketValue(tx, scanMetaFullName, dvIndexListKey, index)
 }
 
-func (s *store) popDepositValue() (DepositValue, error) {
+func (s *store) popDepositValue(ct string) (DepositValue, error) {
 	var dv DepositValue
 
 	if err := s.db.Update(func(tx *bolt.Tx) error {
-		index, err := s.getDepositValueIndexTx(tx)
+		index, err := s.getDepositValueIndexTx(tx, ct)
 		if err != nil {
 			return err
 		}
@@ -256,7 +262,8 @@ func (s *store) popDepositValue() (DepositValue, error) {
 		index = index[1:]
 
 		// write index back to db
-		if err := dbutil.PutBucketValue(tx, scanMetaBkt, dvIndexListKey, index); err != nil {
+		scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+		if err := dbutil.PutBucketValue(tx, scanMetaFullName, dvIndexListKey, index); err != nil {
 			return err
 		}
 
@@ -278,9 +285,10 @@ func (s *store) popDepositValue() (DepositValue, error) {
 // Returns the deposit value index from the db.
 // If there is no deposit value index in the db, nil is returned instead of
 // dbutil.ObjectNotExistErr
-func (s *store) getDepositValueIndexTx(tx *bolt.Tx) ([]string, error) {
+func (s *store) getDepositValueIndexTx(tx *bolt.Tx, ct string) ([]string, error) {
 	var index []string
-	if err := dbutil.GetBucketObject(tx, scanMetaBkt, dvIndexListKey, &index); err != nil {
+	scanMetaFullName := dbutil.ByteJoin(scanMetaBkt, ct, "_")
+	if err := dbutil.GetBucketObject(tx, scanMetaFullName, dvIndexListKey, &index); err != nil {
 		switch err.(type) {
 		case dbutil.ObjectNotExistErr:
 			err = nil
@@ -296,12 +304,12 @@ func (s *store) getDepositValueIndexTx(tx *bolt.Tx) ([]string, error) {
 	return index, nil
 }
 
-func (s *store) getDepositValueIndex() ([]string, error) {
+func (s *store) getDepositValueIndex(ct string) ([]string, error) {
 	var index []string
 
 	if err := s.db.View(func(tx *bolt.Tx) error {
 		var err error
-		index, err = s.getDepositValueIndexTx(tx)
+		index, err = s.getDepositValueIndexTx(tx, ct)
 		return err
 	}); err != nil {
 		return nil, err

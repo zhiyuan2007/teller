@@ -14,8 +14,8 @@ func NewClient(s *Service) *Client {
 // add the btc address to scan service, when detect deposit coin
 // to the btc address, will send specific skycoin to the binded
 // skycoin address
-func (ec *Client) BindAddress(btcAddr, skyAddr string) error {
-	return ec.s.bindAddress(btcAddr, skyAddr)
+func (ec *Client) BindAddress(cAddr, skyAddr, ct string) error {
+	return ec.s.bindAddress(cAddr, skyAddr, ct)
 }
 
 // GetDepositStatuses returns deamon.DepositStatus array of given skycoin address

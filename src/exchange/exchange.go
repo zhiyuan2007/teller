@@ -349,13 +349,19 @@ func (s *Service) processUnconfirmedTx() {
 	}
 }
 
-func (s *Service) bindAddress(btcAddr, skyAddr string) error {
-	if err := s.store.BindAddress(skyAddr, btcAddr); err != nil {
+func (s *Service) bindAddress(Addr, skyAddr, ct string) error {
+	if err := s.store.BindAddress(skyAddr, Addr); err != nil {
 		return err
 	}
 
 	// add btc address to scanner
-	return s.scanner.AddScanAddress(btcAddr)
+	switch ct {
+	case "bitcoin":
+		return s.scanner.AddScanAddress(Addr)
+	case "skycoin":
+		return s.skyScanner.AddScanAddress(Addr)
+	}
+	return errors.New("not support cointype")
 }
 
 // DepositStatus json struct for deposit status

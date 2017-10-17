@@ -20,6 +20,10 @@ import (
 	"strconv"
 )
 
+var (
+	scoinType = "skycoin"
+)
+
 // SKYScanner blockchain scanner to check if there're deposit coins
 type SKYScanner struct {
 	log       logrus.FieldLogger
@@ -32,7 +36,7 @@ type SKYScanner struct {
 
 // NewSKYScanner creates scanner instance
 func NewSKYScanner(log logrus.FieldLogger, db *bolt.DB, rpc *sender.RPC, cfg Config) (*SKYScanner, error) {
-	s, err := newStore(db)
+	s, err := newStore(db, scoinType)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +66,7 @@ func (s *SKYScanner) Run() error {
 	go func() {
 		defer wg.Done()
 		for {
-			headDv, err := s.store.getHeadDepositValue()
+			headDv, err := s.store.getHeadDepositValue(scoinType)
 			if err != nil {
 				switch err.(type) {
 				case DepositValuesEmptyErr:
@@ -86,7 +90,7 @@ func (s *SKYScanner) Run() error {
 				select {
 				case <-dn.AckC:
 					// pop the head deposit value in store
-					if ddv, err := s.store.popDepositValue(); err != nil {
+					if ddv, err := s.store.popDepositValue(scoinType); err != nil {
 						log.WithError(err).Error("popDepositValue failed")
 					} else {
 						log.WithField("depositValue", ddv).Info("DepositValue is processed")
@@ -99,7 +103,7 @@ func (s *SKYScanner) Run() error {
 	}()
 
 	// get last scan block
-	lsb, err := s.getLastScanBlock()
+	lsb, err := s.store.getLastScanBlock(scoinType)
 	if err != nil {
 		return fmt.Errorf("get last scan block failed: %v", err)
 	}
@@ -194,7 +198,7 @@ func (s *SKYScanner) Run() error {
 
 func (s *SKYScanner) scanBlock(block *visor.ReadableBlock) error {
 	return s.store.db.Update(func(tx *bolt.Tx) error {
-		addrs, err := s.store.getScanAddressesTx(tx)
+		addrs, err := s.store.getScanAddressesTx(tx, scoinType)
 		if err != nil {
 			return err
 		}
@@ -205,7 +209,7 @@ func (s *SKYScanner) scanBlock(block *visor.ReadableBlock) error {
 		}
 
 		for _, dv := range dvs {
-			if err := s.store.pushDepositValueTx(tx, dv); err != nil {
+			if err := s.store.pushDepositValueTx(tx, dv, scoinType); err != nil {
 				switch err.(type) {
 				case DepositValueExistsErr:
 					continue
@@ -218,7 +222,7 @@ func (s *SKYScanner) scanBlock(block *visor.ReadableBlock) error {
 		return s.store.setLastScanBlockTx(tx, LastScanBlock{
 			Hash:   block.Head.BlockHash,
 			Height: int64(block.Head.BkSeq),
-		})
+		}, scoinType)
 	})
 }
 
@@ -256,7 +260,7 @@ func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []stri
 
 // AddScanAddress adds new scan address
 func (s *SKYScanner) AddScanAddress(addr string) error {
-	return s.store.addScanAddress(addr)
+	return s.store.addScanAddress(addr, scoinType)
 }
 
 // GetBestBlock returns the hash and height of the block in the longest (best)
@@ -294,17 +298,12 @@ func (s *SKYScanner) setLastScanBlock(hash *chainhash.Hash, height int64) error 
 	return s.store.setLastScanBlock(LastScanBlock{
 		Hash:   hash.String(),
 		Height: height,
-	})
-}
-
-// getLastScanBlock returns the last scanned block hash and height
-func (s *SKYScanner) getLastScanBlock() (LastScanBlock, error) {
-	return s.store.getLastScanBlock()
+	}, scoinType)
 }
 
 // GetScanAddresses returns the deposit addresses that need to scan
 func (s *SKYScanner) GetScanAddresses() ([]string, error) {
-	return s.store.getScanAddresses()
+	return s.store.getScanAddresses(scoinType)
 }
 
 // GetDepositValue returns deposit value channel

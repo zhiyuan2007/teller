@@ -34,5 +34,6 @@
     },
     "sky_sender": {
         "request_buffer_size": 1024
-    }
+    },
+    "support_cointypes": ["bitcoint", "skycoin"]
 }

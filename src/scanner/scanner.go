@@ -43,6 +43,7 @@ func makeDepositNote(dv DepositValue) DepositNote {
 // Config scanner config info
 type Config struct {
 	ScanPeriod time.Duration // scan period in seconds
+	CoinTypes  []string
 }
 
 // DepositValue struct

@@ -20,7 +20,7 @@ type BtcAddrGenerator interface {
 
 // Exchanger provids apis to interact with exchange service
 type Exchanger interface {
-	BindAddress(btcAddr, skyAddr string) error
+	BindAddress(cAddr, skyAddr, ct string) error
 	GetDepositStatuses(skyAddr string) ([]exchange.DepositStatus, error)
 	// Returns the number of btc address the skycoin address binded
 	BindNum(skyAddr string) (int, error)
@@ -119,7 +119,7 @@ func (s *service) BindAddress(samosAddr, coinType string) (string, error) {
 			return "", err
 		}
 
-		if err := s.exchanger.BindAddress(btcAddr, samosAddr); err != nil {
+		if err := s.exchanger.BindAddress(btcAddr, samosAddr, coinType); err != nil {
 			return "", err
 		}
 
@@ -130,7 +130,7 @@ func (s *service) BindAddress(samosAddr, coinType string) (string, error) {
 			return "", err
 		}
 
-		if err := s.exchanger.BindAddress(skyAddr, samosAddr); err != nil {
+		if err := s.exchanger.BindAddress(skyAddr, samosAddr, coinType); err != nil {
 			return "", err
 		}
 

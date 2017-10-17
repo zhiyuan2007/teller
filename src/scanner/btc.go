@@ -21,6 +21,7 @@ import (
 
 var (
 	errBlockNotFound = errors.New("block not found")
+	coinType         = "bitcoin"
 )
 
 const (
@@ -40,7 +41,7 @@ type BTCScanner struct {
 
 // NewBTCScanner creates scanner instance
 func NewBTCScanner(log logrus.FieldLogger, db *bolt.DB, btc BtcRPCClient, cfg Config) (*BTCScanner, error) {
-	s, err := newStore(db)
+	s, err := newStore(db, coinType)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func (s *BTCScanner) Run() error {
 	go func() {
 		defer wg.Done()
 		for {
-			headDv, err := s.store.getHeadDepositValue()
+			headDv, err := s.store.getHeadDepositValue(coinType)
 			if err != nil {
 				switch err.(type) {
 				case DepositValuesEmptyErr:
@@ -94,7 +95,7 @@ func (s *BTCScanner) Run() error {
 				select {
 				case <-dn.AckC:
 					// pop the head deposit value in store
-					if ddv, err := s.store.popDepositValue(); err != nil {
+					if ddv, err := s.store.popDepositValue(coinType); err != nil {
 						log.WithError(err).Error("popDepositValue failed")
 					} else {
 						log.WithField("depositValue", ddv).Info("DepositValue is processed")
@@ -200,7 +201,7 @@ func (s *BTCScanner) Run() error {
 
 func (s *BTCScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
 	return s.store.db.Update(func(tx *bolt.Tx) error {
-		addrs, err := s.store.getScanAddressesTx(tx)
+		addrs, err := s.store.getScanAddressesTx(tx, coinType)
 		if err != nil {
 			return err
 		}
@@ -211,7 +212,7 @@ func (s *BTCScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
 		}
 
 		for _, dv := range dvs {
-			if err := s.store.pushDepositValueTx(tx, dv); err != nil {
+			if err := s.store.pushDepositValueTx(tx, dv, coinType); err != nil {
 				switch err.(type) {
 				case DepositValueExistsErr:
 					continue
@@ -229,7 +230,7 @@ func (s *BTCScanner) scanBlock(block *btcjson.GetBlockVerboseResult) error {
 		return s.store.setLastScanBlockTx(tx, LastScanBlock{
 			Hash:   hash.String(),
 			Height: block.Height,
-		})
+		}, coinType)
 	})
 }
 
@@ -277,7 +278,7 @@ func scanBTCBlock(s *BTCScanner, block *btcjson.GetBlockVerboseResult, depositAd
 
 // AddScanAddress adds new scan address
 func (s *BTCScanner) AddScanAddress(addr string) error {
-	return s.store.addScanAddress(addr)
+	return s.store.addScanAddress(addr, coinType)
 }
 
 // GetBestBlock returns the hash and height of the block in the longest (best)
@@ -329,17 +330,16 @@ func (s *BTCScanner) setLastScanBlock(hash *chainhash.Hash, height int64) error 
 	return s.store.setLastScanBlock(LastScanBlock{
 		Hash:   hash.String(),
 		Height: height,
-	})
+	}, coinType)
 }
 
-// getLastScanBlock returns the last scanned block hash and height
 func (s *BTCScanner) getLastScanBlock() (LastScanBlock, error) {
-	return s.store.getLastScanBlock()
+	return s.store.getLastScanBlock(coinType)
 }
 
 // GetScanAddresses returns the deposit addresses that need to scan
 func (s *BTCScanner) GetScanAddresses() ([]string, error) {
-	return s.store.getScanAddresses()
+	return s.store.getScanAddresses(coinType)
 }
 
 // GetDepositValue returns deposit value channel
