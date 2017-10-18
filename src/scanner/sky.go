@@ -67,6 +67,7 @@ func (s *SKYScanner) Run() error {
 		defer wg.Done()
 		for {
 			headDv, err := s.store.getHeadDepositValue(scoinType)
+			fmt.Printf("get headd deposit value %+v\n", headDv)
 			if err != nil {
 				switch err.(type) {
 				case DepositValuesEmptyErr:
@@ -82,6 +83,7 @@ func (s *SKYScanner) Run() error {
 				}
 			}
 
+			fmt.Printf("-----------star meke dn-----\n")
 			dn := makeDepositNote(headDv)
 			select {
 			case <-s.quit:
@@ -164,6 +166,7 @@ func (s *SKYScanner) Run() error {
 
 			hash = nextBlock.Head.BlockHash
 			height = int64(nextBlock.Head.BkSeq)
+			seq = height
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
@@ -202,6 +205,7 @@ func (s *SKYScanner) scanBlock(block *visor.ReadableBlock) error {
 		if err != nil {
 			return err
 		}
+		fmt.Printf("scan skycoin addrss %+v\n", addrs)
 
 		dvs, err := scanSKYBlock(s, block, addrs)
 		if err != nil {
@@ -241,6 +245,8 @@ func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []stri
 				fmt.Printf("------wrong coin value %s\n-----", v.Coins)
 				continue
 			}
+			fmt.Printf("skycoin-------%d, %+v\n", i, v)
+			fmt.Printf("addr map------, %+v\n", addrMap)
 
 			a := v.Address
 			if _, ok := addrMap[a]; ok {
@@ -255,6 +261,7 @@ func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []stri
 		}
 	}
 
+	fmt.Printf("deposite value------- %+v\n", dv)
 	return dv, nil
 }
 
