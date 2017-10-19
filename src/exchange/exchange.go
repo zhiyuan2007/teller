@@ -162,10 +162,8 @@ func (s *Service) Run() error {
 			return nil
 		case dv, ok := <-s.scanner.GetDepositValue():
 			depositType = "bitcoin"
-			fmt.Println("get bitcoin sender----------")
 			err = s.StartSender(dv, ok, depositType)
 		case dv, ok := <-s.skyScanner.GetDepositValue():
-			fmt.Println("get skycoin sender----------")
 			depositType = "skycoin"
 			err = s.StartSender(dv, ok, depositType)
 
@@ -192,7 +190,6 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 
 	err = s.HandleErrorDeposit(dv, btcTxIndex, err)
 	if err != nil {
-		log.Error("----get DepositInfo failed--- ")
 		return nil
 	}
 
@@ -250,7 +247,6 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 	}
 
 	log = log.WithField("sendSkyDroplets", skyAmt)
-	fmt.Printf("skycoin ----------%llu\n", skyAmt)
 
 	log.Info("Trying to send skycoin")
 
