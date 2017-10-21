@@ -28,6 +28,7 @@ var (
 
 	// index bucket for skycoin address and deposit seqs, skycoin address as key
 	// deposit info seq array as value
+	// do not need type
 	skyDepositSeqsIndexBkt = []byte("sky_deposit_seqs_index")
 )
 

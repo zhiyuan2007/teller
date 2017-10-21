@@ -5,7 +5,6 @@ package exchange
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/boltdb/bolt"
