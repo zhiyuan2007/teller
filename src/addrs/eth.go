@@ -11,36 +11,36 @@ import (
 	//"github.com/skycoin/skycoin/src/cipher"
 )
 
-const skyBucketKey = "used_sky_address"
+const ethBucketKey = "used_eth_address"
 
-// NewSkyAddrs returns an Addrs loaded with BTC addresses
-func NewSkyAddrs(log logrus.FieldLogger, db *bolt.DB, addrsReader io.Reader) (*Addrs, error) {
-	loader, err := loadSkyAddresses(addrsReader)
+// NewEthAddrs returns an Addrs loaded with BTC addresses
+func NewEthAddrs(log logrus.FieldLogger, db *bolt.DB, addrsReader io.Reader) (*Addrs, error) {
+	loader, err := loadEth(addrsReader)
 	if err != nil {
 		return nil, err
 	}
-	return NewAddrs(log, db, loader, skyBucketKey)
+	return NewAddrs(log, db, loader, ethBucketKey)
 }
 
-func loadSkyAddresses(addrsReader io.Reader) ([]string, error) {
+func loadEthAddresses(addrsReader io.Reader) ([]string, error) {
 	var addrs struct {
-		Addresses []string `json:"sky_addresses"`
+		Addresses []string `json:"eth_addresses"`
 	}
 
 	if err := json.NewDecoder(addrsReader).Decode(&addrs); err != nil {
 		return nil, fmt.Errorf("Decode loaded address json failed: %v", err)
 	}
 
-	if err := verifySKYAddresses(addrs.Addresses); err != nil {
+	if err := verifyETHAddresses(addrs.Addresses); err != nil {
 		return nil, err
 	}
 
 	return addrs.Addresses, nil
 }
 
-func verifySKYAddresses(addrs []string) error {
+func verifyETHAddresses(addrs []string) error {
 	if len(addrs) == 0 {
-		return errors.New("No SKY addresses")
+		return errors.New("No ETH addresses")
 	}
 
 	addrMap := make(map[string]struct{}, len(addrs))

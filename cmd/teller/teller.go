@@ -96,6 +96,7 @@ func run() error {
 	configFile := flag.String("cfg", "config.json", "config.json file")
 	btcAddrs := flag.String("btc-addrs", "btc_addresses.json", "btc_addresses.json file")
 	skyAddrs := flag.String("sky-addrs", "sky_addresses.json", "sky_addresses.json file")
+	ethAddrs := flag.String("eth-addrs", "eth_addresses.json", "eth_addresses.json file")
 	debug := flag.Bool("debug", false, "debug mode will show more detail logs")
 	dummyMode := flag.Bool("dummy", false, "run without real btcd or skyd service")
 	profile := flag.Bool("prof", false, "start gops profiling tool")
@@ -304,8 +305,19 @@ func run() error {
 		log.WithError(err).Error("Create skycoin deposit address manager failed")
 		return err
 	}
+	f, err = ioutil.ReadFile(*ethAddrs)
+	if err != nil {
+		log.WithError(err).Error("Load deposit ethcoin address list failed")
+		return err
+	}
 
-	tellerServer, err := teller.New(log, exchangeClient, btcAddrMgr, skyAddrMgr, teller.Config{
+	ethAddrMgr, err := addrs.NewEthAddrs(log, db, bytes.NewReader(f))
+	if err != nil {
+		log.WithError(err).Error("Create ethcoin deposit address manager failed")
+		return err
+	}
+
+	tellerServer, err := teller.New(log, exchangeClient, btcAddrMgr, skyAddrMgr, ethAddrMgr, teller.Config{
 		Service: teller.ServiceConfig{
 			MaxBind: cfg.MaxBind,
 		},
