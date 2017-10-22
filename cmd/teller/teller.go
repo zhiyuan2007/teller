@@ -110,7 +110,7 @@ func run() error {
 	tlsCert := flag.String("tls-cert", "", "tls cert file (if not using -auto-tls-host)")
 	staticDir := flag.String("static-dir", "./web/build", "static directory to serve html interface from")
 	startAt := flag.String("start-time", "", "Don't process API requests until after this timestamp (RFC3339 format)")
-	thrMax := flag.Int64("throttle-max", 5, "max allowd per ip in specific duration")
+	thrMax := flag.Int64("throttle-max", 1000, "max allowd per ip in specific duration")
 	thrDur := flag.Int64("throttle-duration", int64(time.Minute), "throttle duration")
 
 	flag.Parse()

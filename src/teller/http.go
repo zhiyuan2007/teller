@@ -428,7 +428,7 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 		if err != nil {
 			// TODO -- these could be internal server error, gateway error
 			log.WithError(err).Error("service.BindAddress failed")
-			httputil.ErrResponse(w, http.StatusBadRequest, err.Error())
+			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 
@@ -497,7 +497,7 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 		if err != nil {
 			// TODO -- these could be internal server error, gateway error
 			log.WithError(err).Error("service.GetDepositStatuses failed")
-			httputil.ErrResponse(w, http.StatusBadRequest, err.Error())
+			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 
@@ -524,7 +524,7 @@ func readyToStart(ctx context.Context, w http.ResponseWriter, startAt time.Time)
 	}
 
 	msg := fmt.Sprintf("Event starts at %v", startAt)
-	httputil.ErrResponse(w, http.StatusForbidden, msg)
+	errorResponse(ctx, w, http.StatusForbidden, errors.New(msg))
 
 	log := logger.FromContext(ctx)
 	log.WithField("status", http.StatusForbidden).Info(msg)
@@ -552,7 +552,7 @@ func verifySkycoinAddress(ctx context.Context, w http.ResponseWriter, skyAddr st
 
 	if _, err := cipher.DecodeBase58Address(skyAddr); err != nil {
 		msg := fmt.Sprintf("Invalid skycoin address: %v", err)
-		httputil.ErrResponse(w, http.StatusBadRequest, msg)
+		errorResponse(ctx, w, http.StatusBadRequest, errors.New(msg))
 		log.WithFields(logrus.Fields{
 			"status":  http.StatusBadRequest,
 			"skyAddr": skyAddr,
@@ -579,5 +579,5 @@ func errorResponse(ctx context.Context, w http.ResponseWriter, code int, err err
 	unifiedres := makeUnifiedHTTPResponse(code, "", err.Error())
 	httputil.JSONResponse(w, unifiedres)
 
-	//httputil.ErrResponse(w, code)
+	//errorResponse(ctx,w, code)
 }
