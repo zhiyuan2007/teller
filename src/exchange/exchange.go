@@ -20,6 +20,8 @@ import (
 )
 
 const satoshiPerBTC int64 = 1e8
+const dropletsPerSPA int64 = 1e6
+const weiPerEth int64 = 1e16
 
 // SkySender provids apis for sending skycoin
 type SkySender interface {
@@ -65,6 +67,66 @@ func calculateSkyValue(satoshis, skyPerBTC int64) (uint64, error) {
 	return uint64(amt), nil
 }
 
+// calculateSkyValueForSpa returns the amount of SKY (in droplets) to give for an
+// amount of SPACO (in droplets).
+// Rate is measured in SKY per SPACO
+func calculateSkyValueForSpa(droplets, skyPerSPA int64) (uint64, error) {
+	if droplets < 0 || skyPerSPA < 0 {
+		return 0, errors.New("negative droplets or negative skyPerSPA")
+	}
+
+	spa := decimal.New(droplets, 0)
+	spaToDroplets := decimal.New(dropletsPerSPA, 0)
+	spa = spa.DivRound(spaToDroplets, 6)
+
+	rate := decimal.New(skyPerSPA, 0)
+
+	sky := spa.Mul(rate)
+	sky = sky.Truncate(daemon.MaxDropletPrecision)
+
+	skyToDroplets := decimal.New(droplet.Multiplier, 0)
+	droplets111 := sky.Mul(skyToDroplets)
+
+	amt := droplets111.IntPart()
+	if amt < 0 {
+		// This should never occur, but double check before we convert to uint64,
+		// otherwise we would send all the coins due to integer wrapping.
+		return 0, errors.New("calculated sky amount is negative")
+	}
+
+	return uint64(amt), nil
+}
+
+// calculateSkyValueForEth returns the amount of SKY (in wei) to give for an
+// amount of Eth (in wei).
+// Rate is measured in SKY per Eth
+func calculateSkyValueForEth(wei, skyPerEth int64) (uint64, error) {
+	if wei < 0 || skyPerEth < 0 {
+		return 0, errors.New("negative wei or negative skyPerEth")
+	}
+
+	eth := decimal.New(wei, 0)
+	ethToWei := decimal.New(weiPerEth, 0)
+	eth = eth.DivRound(ethToWei, 16)
+
+	rate := decimal.New(skyPerEth, 0)
+
+	sky := eth.Mul(rate)
+	sky = sky.Truncate(daemon.MaxDropletPrecision)
+
+	skyToDroplets := decimal.New(droplet.Multiplier, 0)
+	droplets := sky.Mul(skyToDroplets)
+
+	amt := droplets.IntPart()
+	if amt < 0 {
+		// This should never occur, but double check before we convert to uint64,
+		// otherwise we would send all the coins due to integer wrapping.
+		return 0, errors.New("calculated sky amount is negative")
+	}
+
+	return uint64(amt), nil
+}
+
 // Service manages coin exchange between deposits and skycoin
 type Service struct {
 	log        logrus.FieldLogger
@@ -79,7 +141,9 @@ type Service struct {
 
 // Config exchange config struct
 type Config struct {
-	Rate int64 // sky_btc rate
+	Rate    int64 // sky_btc rate
+	SkyRate int64 // sky_spa rate
+	EthRate int64 // sky_eth rate
 }
 
 // NewService creates exchange service
@@ -88,6 +152,7 @@ func NewService(log logrus.FieldLogger, db *bolt.DB, scanner, skyScanner, ethSca
 	if err != nil {
 		panic(err)
 	}
+	log.Debugf("Config exchange: %+v\n", cfg)
 
 	return &Service{
 		cfg:        cfg,
@@ -235,21 +300,30 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		return errors.New("Send service closed")
 	}
 
-	log = log.WithField("skyRate", s.cfg.Rate)
-
 	// try to send skycoin
 	skyAmt := uint64(0)
 	switch depositType {
 	case "bitcoin":
+		log = log.WithField("skyRate", s.cfg.Rate)
 		skyAmt, err = calculateSkyValue(dv.Value, s.cfg.Rate)
 		if err != nil {
 			log.WithError(err).Error("calculateSkyValue failed")
 			return nil
 		}
 	case "skycoin":
-		skyAmt = uint64(dv.Value * 1e6)
+		log = log.WithField("skyRate", s.cfg.SkyRate)
+		skyAmt, err = calculateSkyValueForSpa(dv.Value, s.cfg.SkyRate)
+		if err != nil {
+			log.WithError(err).Error("calculateSkyValue failed")
+			return nil
+		}
 	case "ethcoin":
-		skyAmt = uint64(dv.Value / 1e6)
+		log = log.WithField("skyRate", s.cfg.EthRate)
+		skyAmt, err = calculateSkyValueForSpa(dv.Value, s.cfg.EthRate)
+		if err != nil {
+			log.WithError(err).Error("calculateSkyValue failed")
+			return nil
+		}
 	}
 
 	log = log.WithField("sendSkyDroplets", skyAmt)

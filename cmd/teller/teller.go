@@ -288,7 +288,9 @@ func run() error {
 
 	// create exchange service
 	exchangeService := exchange.NewService(log, db, btcScanner, skyScanner, ethScanner, sendRPC, exchange.Config{
-		Rate: cfg.ExchangeRate,
+		Rate:    cfg.ExchangeRate,
+		SkyRate: cfg.SkyExchangeRate,
+		EthRate: cfg.EthExchangeRate,
 	})
 	background("exchangeService.Run", errC, exchangeService.Run)
 

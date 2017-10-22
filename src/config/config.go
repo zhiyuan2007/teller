@@ -23,7 +23,9 @@ type Config struct {
 	Skynode   Skynode `json:"skynode"`
 	Samosnode Skynode `json:"samosnode"`
 
-	ExchangeRate int64 `json:"exchange_rate"`
+	ExchangeRate    int64 `json:"btc_exchange_rate"`
+	SkyExchangeRate int64 `json:"sky_exchange_rate"`
+	EthExchangeRate int64 `json:"eth_exchange_rate"`
 
 	Btcscan   Btcscan   `json:"btc_scan"`
 	Btcrpc    Btcrpc    `json:"btc_rpc"`
@@ -66,6 +68,14 @@ func New(path string) (*Config, error) {
 // ExchangeRate represents the exchange rate, it has two field, Time and Rate
 // Time should be in the form of 2017-04-30 00:00:00
 type ExchangeRate struct {
+	Date string  `json:"date"`
+	Rate float64 `json:"rate"`
+}
+type SkyExchangeRate struct {
+	Date string  `json:"date"`
+	Rate float64 `json:"rate"`
+}
+type EthExchangeRate struct {
 	Date string  `json:"date"`
 	Rate float64 `json:"rate"`
 }
