@@ -43,7 +43,7 @@ type Teller struct {
 }
 
 // New creates a Teller
-func New(log logrus.FieldLogger, exchanger Exchanger, btcAddrGen, skyAddrGen BtcAddrGenerator, cfg Config) (*Teller, error) {
+func New(log logrus.FieldLogger, exchanger Exchanger, btcAddrGen, skyAddrGen, ethAddrGen BtcAddrGenerator, cfg Config) (*Teller, error) {
 	if err := cfg.HTTP.Validate(); err != nil {
 		return nil, err
 	}
@@ -57,6 +57,7 @@ func New(log logrus.FieldLogger, exchanger Exchanger, btcAddrGen, skyAddrGen Btc
 			exchanger:  exchanger,
 			btcAddrGen: btcAddrGen,
 			skyAddrGen: skyAddrGen,
+			ethAddrGen: ethAddrGen,
 		}),
 	}, nil
 }
@@ -95,7 +96,8 @@ type service struct {
 	cfg        ServiceConfig
 	exchanger  Exchanger        // exchange Teller client
 	btcAddrGen BtcAddrGenerator // btc address generator
-	skyAddrGen BtcAddrGenerator // zebra address generator
+	skyAddrGen BtcAddrGenerator // sky address generator
+	ethAddrGen BtcAddrGenerator // eth address generator
 }
 
 // BindAddress binds skycoin address with a deposit btc address
@@ -135,6 +137,17 @@ func (s *service) BindAddress(samosAddr, coinType string) (string, error) {
 		}
 
 		return skyAddr, nil
+	case "ethcoin":
+		ethAddr, err := s.ethAddrGen.NewAddress()
+		if err != nil {
+			return "", err
+		}
+
+		if err := s.exchanger.BindAddress(ethAddr, samosAddr, coinType); err != nil {
+			return "", err
+		}
+
+		return ethAddr, nil
 	}
 
 	return "", errors.New("not support cointype")

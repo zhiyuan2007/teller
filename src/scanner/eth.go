@@ -8,6 +8,7 @@ package scanner
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -15,17 +16,14 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sirupsen/logrus"
-	"math/big"
-	"strconv"
-	"time"
 )
 
 var (
-	scoinType = "ethcoin"
+	ecoinType = "ethcoin"
 )
 
 // ETHScanner blockchain scanner to check if there're deposit coins
@@ -39,8 +37,8 @@ type ETHScanner struct {
 }
 
 // NewETHScanner creates scanner instance
-func NewETHScanner(log logrus.FieldLogger, db *bolt.DB, client *rpc.Client, cfg Config) (*ETHScanner, error) {
-	s, err := newStore(db, scoinType)
+func NewETHScanner(log logrus.FieldLogger, db *bolt.DB, ethurl string, cfg Config) (*ETHScanner, error) {
+	s, err := newStore(db, ecoinType)
 	if err != nil {
 		return nil, err
 	}
@@ -49,9 +47,14 @@ func NewETHScanner(log logrus.FieldLogger, db *bolt.DB, client *rpc.Client, cfg 
 		cfg.ScanPeriod = checkHeadDepositValuePeriod
 	}
 
+	client, err := rpc.Dial(ethurl)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ETHScanner{
 		ethClient: client,
-		log:       log.WithField("prefix", "scanner.btc"),
+		log:       log.WithField("prefix", "scanner.eth"),
 		cfg:       cfg,
 		store:     s,
 		depositC:  make(chan DepositNote),
@@ -62,15 +65,15 @@ func NewETHScanner(log logrus.FieldLogger, db *bolt.DB, client *rpc.Client, cfg 
 // Run starts the scanner
 func (s *ETHScanner) Run() error {
 	log := s.log
-	log.Info("Start skycoin blockchain scan service")
-	defer log.Info("Skycoin blockchain scan service closed")
+	log.Info("Start ethcoin blockchain scan service")
+	defer log.Info("Ethcoin blockchain scan service closed")
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
-			headDv, err := s.store.getHeadDepositValue(scoinType)
+			headDv, err := s.store.getHeadDepositValue(ecoinType)
 			if err != nil {
 				switch err.(type) {
 				case DepositValuesEmptyErr:
@@ -94,7 +97,7 @@ func (s *ETHScanner) Run() error {
 				select {
 				case <-dn.AckC:
 					// pop the head deposit value in store
-					if ddv, err := s.store.popDepositValue(scoinType); err != nil {
+					if ddv, err := s.store.popDepositValue(ecoinType); err != nil {
 						log.WithError(err).Error("popDepositValue failed")
 					} else {
 						log.WithField("depositValue", ddv).Info("DepositValue is processed")
@@ -107,7 +110,7 @@ func (s *ETHScanner) Run() error {
 	}()
 
 	// get last scan block
-	lsb, err := s.store.getLastScanBlock(scoinType)
+	lsb, err := s.store.getLastScanBlock(ecoinType)
 	if err != nil {
 		return fmt.Errorf("get last scan block failed: %v", err)
 	}
@@ -130,11 +133,11 @@ func (s *ETHScanner) Run() error {
 		}
 
 		if err := s.scanBlock(block); err != nil {
-			return fmt.Errorf("Scan block %s failed: %v", block.Head.BlockHash, err)
+			return fmt.Errorf("Scan block %s failed: %v", block.HashNoNonce().String(), err)
 		}
 
-		hash = block.Head.BlockHash
-		seq = int64(block.Head.BkSeq)
+		hash = block.HashNoNonce().String()
+		seq = int64(block.NumberU64())
 		log = log.WithField("blockHash", hash)
 	}
 
@@ -166,21 +169,21 @@ func (s *ETHScanner) Run() error {
 				}
 			}
 
-			hash = nextBlock.Head.BlockHash
-			height = int64(nextBlock.Head.BkSeq)
+			hash = nextBlock.HashNoNonce().String()
+			height = int64(nextBlock.NumberU64())
 			seq = height
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
 			})
 
-			log.Debug("Scanned new block")
+			log.Debugf("Scanned new block %u\n", height)
 			if err := s.scanBlock(nextBlock); err != nil {
 				select {
 				case <-s.quit:
 					return
 				default:
-					errC <- fmt.Errorf("Scan block %s failed: %v", nextBlock.Head.BlockHash, err)
+					errC <- fmt.Errorf("Scan block %s failed: %v", nextBlock.HashNoNonce().String(), err)
 					return
 				}
 			}
@@ -201,21 +204,19 @@ func (s *ETHScanner) Run() error {
 	}
 }
 
-func (s *ETHScanner) scanBlock(block *visor.ReadableBlock) error {
+func (s *ETHScanner) scanBlock(block *types.Block) error {
 	return s.store.db.Update(func(tx *bolt.Tx) error {
-		addrs, err := s.store.getScanAddressesTx(tx, scoinType)
+		addrs, err := s.store.getScanAddressesTx(tx, ecoinType)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("scan skycoin addrss %+v\n", addrs)
-
 		dvs, err := scanETHBlock(s, block, addrs)
 		if err != nil {
 			return err
 		}
 
 		for _, dv := range dvs {
-			if err := s.store.pushDepositValueTx(tx, dv, scoinType); err != nil {
+			if err := s.store.pushDepositValueTx(tx, dv, ecoinType); err != nil {
 				switch err.(type) {
 				case DepositValueExistsErr:
 					continue
@@ -226,38 +227,42 @@ func (s *ETHScanner) scanBlock(block *visor.ReadableBlock) error {
 		}
 
 		return s.store.setLastScanBlockTx(tx, LastScanBlock{
-			Hash:   block.Head.BlockHash,
-			Height: int64(block.Head.BkSeq),
-		}, scoinType)
+			Hash:   block.HashNoNonce().String(),
+			Height: int64(block.NumberU64()),
+		}, ecoinType)
 	})
 }
 
 // scanETHBlock scan the given block and returns the next block hash or error
-func scanETHBlock(s *ETHScanner, block *visor.ReadableBlock, depositAddrs []string) ([]DepositValue, error) {
+func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]DepositValue, error) {
 	addrMap := map[string]struct{}{}
 	for _, a := range depositAddrs {
 		addrMap[a] = struct{}{}
 	}
 
 	var dv []DepositValue
-	for _, tx := range block.Body.Transactions {
-		for i, v := range tx.Out {
-			amt, ee := strconv.Atoi(v.Coins)
-			if ee != nil {
-				fmt.Printf("------wrong coin value %s\n-----", v.Coins)
-				continue
-			}
+	for i, txid := range block.Transactions() {
 
-			a := v.Address
-			if _, ok := addrMap[a]; ok {
-				dv = append(dv, DepositValue{
-					Address: a,
-					Value:   int64(amt),
-					Height:  int64(block.Head.BkSeq),
-					Tx:      tx.Hash,
-					N:       uint32(i),
-				})
-			}
+		tx, err := s.GetTransaction(txid.Hash())
+		if err != nil {
+			fmt.Printf("------wrong get transcation %s\n-----", txid.Hash().String())
+			continue
+		}
+		to := tx.To()
+		if to == nil {
+			fmt.Printf("this is a contract transcation +%v\n", tx)
+			continue
+		}
+		amt := tx.Value().Int64()
+		a := to.String()
+		if _, ok := addrMap[a]; ok {
+			dv = append(dv, DepositValue{
+				Address: a,
+				Value:   amt,
+				Height:  int64(block.NumberU64()),
+				Tx:      tx.String(),
+				N:       uint32(i),
+			})
 		}
 	}
 
@@ -266,13 +271,13 @@ func scanETHBlock(s *ETHScanner, block *visor.ReadableBlock, depositAddrs []stri
 
 // AddScanAddress adds new scan address
 func (s *ETHScanner) AddScanAddress(addr string) error {
-	return s.store.addScanAddress(addr, scoinType)
+	return s.store.addScanAddress(addr, ecoinType)
 }
 
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
-func (s *ETHScanner) getBestBlock() (*visor.ReadableBlock, error) {
-	rb, err := s.skyClient.GetLastBlocks()
+func (s *ETHScanner) getBestBlock() (*types.Block, error) {
+	rb, err := s.getBlock(437000)
 	if err != nil {
 		return nil, err
 	}
@@ -281,22 +286,31 @@ func (s *ETHScanner) getBestBlock() (*visor.ReadableBlock, error) {
 }
 
 // getBlock returns block of given hash
-func (s *ETHScanner) getBlock(seq uint64) (*visor.ReadableBlock, error) {
-	rb, err := s.skyClient.GetBlocksBySeq(seq)
+func (s *ETHScanner) getBlock(seq uint64) (*types.Block, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	block, err := ethclient.NewClient(s.ethClient).BlockByNumber(ctx, big.NewInt(int64(seq)))
 	if err != nil {
 		return nil, err
 	}
 
-	return rb, err
-}
-
-func (s *ETHScanner) getRawTransactionVerbose(hash string) (*webrpc.TxnResult, error) {
-	return s.skyClient.GetTransaction(hash)
+	return block, err
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist
-func (s *ETHScanner) getNextBlock(seq uint64) (*visor.ReadableBlock, error) {
+func (s *ETHScanner) getNextBlock(seq uint64) (*types.Block, error) {
 	return s.getBlock(seq + 1)
+}
+
+func (s *ETHScanner) GetTransaction(txhash common.Hash) (*types.Transaction, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	//txhash := common.StringToHash(txid)
+	tx, _, err := ethclient.NewClient(s.ethClient).TransactionByHash(ctx, txhash)
+	if err != nil {
+		return nil, err
+	}
+	return tx, err
 }
 
 // setLastScanBlock sets the last scan block hash and height
@@ -304,12 +318,12 @@ func (s *ETHScanner) setLastScanBlock(hash *chainhash.Hash, height int64) error 
 	return s.store.setLastScanBlock(LastScanBlock{
 		Hash:   hash.String(),
 		Height: height,
-	}, scoinType)
+	}, ecoinType)
 }
 
 // GetScanAddresses returns the deposit addresses that need to scan
 func (s *ETHScanner) GetScanAddresses() ([]string, error) {
-	return s.store.getScanAddresses(scoinType)
+	return s.store.getScanAddresses(ecoinType)
 }
 
 // GetDepositValue returns deposit value channel
@@ -321,5 +335,5 @@ func (s *ETHScanner) GetDepositValue() <-chan DepositNote {
 func (s *ETHScanner) Shutdown() {
 	s.log.Info("Closing ETH scanner")
 	close(s.quit)
-	s.skyClient.Shutdown()
+	s.ethClient.Close()
 }

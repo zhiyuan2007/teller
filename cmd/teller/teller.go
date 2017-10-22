@@ -208,6 +208,7 @@ func run() error {
 
 	var btcScanner scanner.Scanner
 	var skyScanner scanner.Scanner
+	var ethScanner scanner.Scanner
 	var scanRPC exchange.BtcScanner
 	var sendService *sender.SendService
 	var sendRPC exchange.SkySender
@@ -216,6 +217,7 @@ func run() error {
 		log.Info("btcd and skyd disabled, running in dummy mode")
 		btcScanner = &dummyBtcScanner{log: log}
 		skyScanner = &dummyBtcScanner{log: log}
+		ethScanner = &dummyBtcScanner{log: log}
 		sendRPC = &dummySkySender{log: log}
 	} else {
 		// check skycoin setup
@@ -228,7 +230,6 @@ func run() error {
 			log.WithError(err).Error("checkSamoscoinSetup failed")
 			return err
 		}
-
 		// create btc rpc client
 		btcrpcConnConf := makeBtcrpcConfg(*cfg)
 		btcrpc, err := btcrpcclient.New(&btcrpcConnConf, nil)
@@ -264,6 +265,17 @@ func run() error {
 
 		background("skyScanner.Run", errC, skyScanner.Run)
 
+		ethScanner, err = scanner.NewETHScanner(log, db, cfg.Ethurl, scanner.Config{
+			ScanPeriod: cfg.Btcscan.CheckPeriod,
+			CoinTypes:  cfg.CoinTypes,
+		})
+		if err != nil {
+			log.WithError(err).Error("Open scan service failed")
+			return err
+		}
+
+		background("ethScanner.Run", errC, ethScanner.Run)
+
 		samosRPC := sender.NewRPC(cfg.Samosnode.WalletPath, cfg.Samosnode.RPCAddress)
 
 		// create skycoin send service
@@ -275,7 +287,7 @@ func run() error {
 	}
 
 	// create exchange service
-	exchangeService := exchange.NewService(log, db, btcScanner, skyScanner, sendRPC, exchange.Config{
+	exchangeService := exchange.NewService(log, db, btcScanner, skyScanner, ethScanner, sendRPC, exchange.Config{
 		Rate: cfg.ExchangeRate,
 	})
 	background("exchangeService.Run", errC, exchangeService.Run)

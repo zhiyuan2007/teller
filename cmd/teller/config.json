@@ -35,5 +35,6 @@
     "sky_sender": {
         "request_buffer_size": 1024
     },
-    "support_cointypes": ["bitcoint", "skycoin"]
+    "support_cointypes": ["bitcoint", "skycoin", "ethcoin"],
+    "ethurl" : "http://121.010022.cn:8545"
 }

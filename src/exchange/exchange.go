@@ -71,6 +71,7 @@ type Service struct {
 	cfg        Config
 	scanner    BtcScanner // scanner provides apis for interacting with scan service
 	skyScanner BtcScanner // scanner provides apis for interacting with scan service
+	ethScanner BtcScanner // scanner provides apis for interacting with scan service
 	sender     SkySender  // sender provides apis for sending skycoin
 	store      *store     // deposit info storage
 	quit       chan struct{}
@@ -82,7 +83,7 @@ type Config struct {
 }
 
 // NewService creates exchange service
-func NewService(log logrus.FieldLogger, db *bolt.DB, scanner, skyScanner BtcScanner, sender SkySender, cfg Config) *Service {
+func NewService(log logrus.FieldLogger, db *bolt.DB, scanner, skyScanner, ethScanner BtcScanner, sender SkySender, cfg Config) *Service {
 	s, err := newStore(db, log)
 	if err != nil {
 		panic(err)
@@ -93,6 +94,7 @@ func NewService(log logrus.FieldLogger, db *bolt.DB, scanner, skyScanner BtcScan
 		log:        log.WithField("prefix", "teller.exchange"),
 		scanner:    scanner,
 		skyScanner: skyScanner,
+		ethScanner: ethScanner,
 
 		sender: sender,
 		store:  s,
@@ -164,6 +166,9 @@ func (s *Service) Run() error {
 			err = s.StartSender(dv, ok, depositType)
 		case dv, ok := <-s.skyScanner.GetDepositValue():
 			depositType = "skycoin"
+			err = s.StartSender(dv, ok, depositType)
+		case dv, ok := <-s.ethScanner.GetDepositValue():
+			depositType = "ethcoin"
 			err = s.StartSender(dv, ok, depositType)
 
 		}
@@ -243,6 +248,8 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		}
 	case "skycoin":
 		skyAmt = uint64(dv.Value * 1e6)
+	case "ethcoin":
+		skyAmt = uint64(dv.Value / 1e6)
 	}
 
 	log = log.WithField("sendSkyDroplets", skyAmt)

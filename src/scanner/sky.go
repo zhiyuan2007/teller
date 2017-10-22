@@ -47,7 +47,7 @@ func NewSKYScanner(log logrus.FieldLogger, db *bolt.DB, rpc *sender.RPC, cfg Con
 
 	return &SKYScanner{
 		skyClient: rpc,
-		log:       log.WithField("prefix", "scanner.btc"),
+		log:       log.WithField("prefix", "scanner.sky"),
 		cfg:       cfg,
 		store:     s,
 		depositC:  make(chan DepositNote),

@@ -29,6 +29,7 @@ type Config struct {
 	Btcrpc    Btcrpc    `json:"btc_rpc"`
 	SkySender SkySender `json:"sky_sender"`
 	CoinTypes []string  `json:"support_cointypes"`
+	Ethurl    string    `json:"ethurl"`
 }
 
 // Btcscan config for scanner

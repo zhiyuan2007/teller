@@ -15,7 +15,7 @@ const ethBucketKey = "used_eth_address"
 
 // NewEthAddrs returns an Addrs loaded with BTC addresses
 func NewEthAddrs(log logrus.FieldLogger, db *bolt.DB, addrsReader io.Reader) (*Addrs, error) {
-	loader, err := loadEth(addrsReader)
+	loader, err := loadEthAddresses(addrsReader)
 	if err != nil {
 		return nil, err
 	}
