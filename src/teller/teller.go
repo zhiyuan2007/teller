@@ -161,6 +161,8 @@ func (s *service) GetDepositStatuses(skyAddr, coinType string) ([]exchange.Depos
 		return s.exchanger.GetDepositStatuses(skyAddr)
 	case "skycoin":
 		return s.exchanger.GetDepositStatuses(skyAddr)
+	case "ethcoin":
+		return s.exchanger.GetDepositStatuses(skyAddr)
 	}
 
 	return []exchange.DepositStatus{}, errors.New("not support cointype")

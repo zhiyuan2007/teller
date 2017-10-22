@@ -474,6 +474,8 @@ func (s *Service) bindAddress(Addr, skyAddr, ct string) error {
 		return s.scanner.AddScanAddress(Addr)
 	case "skycoin":
 		return s.skyScanner.AddScanAddress(Addr)
+	case "ethcoin":
+		return s.ethScanner.AddScanAddress(Addr)
 	}
 	return errors.New("not support cointype")
 }

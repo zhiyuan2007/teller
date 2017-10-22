@@ -248,7 +248,7 @@ func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []stri
 			if _, ok := addrMap[a]; ok {
 				dv = append(dv, DepositValue{
 					Address: a,
-					Value:   int64(amt),
+					Value:   int64(amt * 1e6),
 					Height:  int64(block.Head.BkSeq),
 					Tx:      tx.Hash,
 					N:       uint32(i),

@@ -250,7 +250,7 @@ func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]D
 		}
 		to := tx.To()
 		if to == nil {
-			fmt.Printf("this is a contract transcation +%v\n", tx)
+			//-fmt.Printf("this is a contract transcation +%v\n", tx)
 			continue
 		}
 		amt := tx.Value().Int64()
@@ -277,7 +277,7 @@ func (s *ETHScanner) AddScanAddress(addr string) error {
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
 func (s *ETHScanner) getBestBlock() (*types.Block, error) {
-	rb, err := s.getBlock(437000)
+	rb, err := s.getBlock(4370000)
 	if err != nil {
 		return nil, err
 	}
@@ -290,11 +290,11 @@ func (s *ETHScanner) getBlock(seq uint64) (*types.Block, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	block, err := ethclient.NewClient(s.ethClient).BlockByNumber(ctx, big.NewInt(int64(seq)))
-	if err != nil {
+	if err != nil && err.Error() != "not found" {
 		return nil, err
 	}
 
-	return block, err
+	return block, nil
 }
 
 // getNextBlock returns the next block of given hash, return nil if next block does not exist
@@ -310,7 +310,7 @@ func (s *ETHScanner) GetTransaction(txhash common.Hash) (*types.Transaction, err
 	if err != nil {
 		return nil, err
 	}
-	return tx, err
+	return tx, nil
 }
 
 // setLastScanBlock sets the last scan block hash and height
