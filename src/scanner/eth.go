@@ -9,6 +9,7 @@ package scanner
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -277,7 +278,18 @@ func (s *ETHScanner) AddScanAddress(addr string) error {
 // GetBestBlock returns the hash and height of the block in the longest (best)
 // chain.
 func (s *ETHScanner) getBestBlock() (*types.Block, error) {
-	rb, err := s.getBlock(4370000)
+	var bn string
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.ethClient.CallContext(ctx, &bn, "eth_blockNumber"); err != nil {
+		return nil, err
+	}
+	bnRealStr := bn[2:]
+	blockNum, err := strconv.ParseInt(bnRealStr, 16, 32)
+	if err != nil {
+		return nil, err
+	}
+	rb, err := s.getBlock(uint64(blockNum))
 	if err != nil {
 		return nil, err
 	}
