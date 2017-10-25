@@ -14,9 +14,9 @@
         "rpc_address": "127.0.0.1:8431",
         "wallet_path": "/Users/liuguirong/.samoscoin/wallets/origin1.wlt"
     },
-    "sponode": {//spaco token
-        "rpc_address": "127.0.0.1:8620",
-        "wallet_path": "/Users/liuguirong/.samoscoin/wallets/origin1.wlt"        
+    "spaconode": {//spaco token
+        "rpc_address": "127.0.0.1:8630",
+        "wallet_path": "/home/hanyouhong/.spo/wallets/otc.wlt"        
     },
     "skynode": {
         "rpc_address": "127.0.0.1:8431",
