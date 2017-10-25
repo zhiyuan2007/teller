@@ -22,6 +22,7 @@ type Config struct {
 
 	Skynode   Skynode `json:"skynode"`
 	Samosnode Skynode `json:"samosnode"`
+	Spaconode Skynode `json:"spaconode"`
 
 	ExchangeRate    int64 `json:"btc_exchange_rate"`
 	SkyExchangeRate int64 `json:"sky_exchange_rate"`
@@ -40,7 +41,7 @@ type Btcscan struct {
 	DepositBufferSize uint32        `json:"deposit_buffer_size"`
 }
 
-// Skynode represents the skycoin node related config
+// Skynode represents the skycoin fammily node related config
 type Skynode struct {
 	RPCAddress string `json:"rpc_address"`
 	WalletPath string `json:"wallet_path"`

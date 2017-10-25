@@ -20,18 +20,18 @@ import (
 	"github.com/google/gops/agent"
 	"github.com/sirupsen/logrus"
 
-	"github.com/skycoin/teller/src/addrs"
-	"github.com/skycoin/teller/src/config"
-	"github.com/skycoin/teller/src/exchange"
-	"github.com/skycoin/teller/src/monitor"
-	"github.com/skycoin/teller/src/scanner"
-	"github.com/skycoin/teller/src/sender"
-	"github.com/skycoin/teller/src/teller"
-	"github.com/skycoin/teller/src/util/logger"
+	"github.com/spaco/teller/src/addrs"
+	"github.com/spaco/teller/src/config"
+	"github.com/spaco/teller/src/exchange"
+	"github.com/spaco/teller/src/monitor"
+	"github.com/spaco/teller/src/scanner"
+	"github.com/spaco/teller/src/sender"
+	"github.com/spaco/teller/src/teller"
+	"github.com/spaco/teller/src/util/logger"
 )
 
 const (
-	appDir = ".skycoin-teller"
+	appDir = ".spo-teller"
 	dbName = "data.db"
 )
 
@@ -139,7 +139,7 @@ func run() error {
 
 	// load config
 	cfg, err := config.New(*configFile)
-	cfg.CoinTypes = []string{"bitcoin", "skycoin"}
+	//	cfg.CoinTypes = []string{"bitcoin", "skycoin"}
 	if err != nil {
 		log.WithError(err).Error("Load config failed")
 		return err
@@ -225,9 +225,9 @@ func run() error {
 			log.WithError(err).Error("checkSkycoinSetup failed")
 			return err
 		}
-		// check samoscoin setup
-		if err := checkSamoscoinSetup(*cfg); err != nil {
-			log.WithError(err).Error("checkSamoscoinSetup failed")
+		// check spaco token setup
+		if err := checkSpacoTokenSetup(*cfg); err != nil {
+			log.WithError(err).Error("checkSpacoTokenSetup failed")
 			return err
 		}
 		// create btc rpc client
@@ -239,6 +239,8 @@ func run() error {
 		}
 		log.Info("Connect to btcd success")
 		skyrpc := sender.NewRPC(cfg.Skynode.WalletPath, cfg.Skynode.RPCAddress)
+		//spaco token rpc
+		spacoRpc := sender.NewRPC(cfg.Spaconode.WalletPath, cfg.Spaconode.RPCAddress)
 		log.Info("Connect to skycoind success")
 
 		// create scan service
@@ -276,10 +278,10 @@ func run() error {
 
 		background("ethScanner.Run", errC, ethScanner.Run)
 
-		samosRPC := sender.NewRPC(cfg.Samosnode.WalletPath, cfg.Samosnode.RPCAddress)
+		//samosRPC := sender.NewRPC(cfg.Samosnode.WalletPath, cfg.Samosnode.RPCAddress)
 
 		// create skycoin send service
-		sendService = sender.NewService(makeSendConfig(*cfg), log, samosRPC)
+		sendService = sender.NewService(makeSendConfig(*cfg), log, spacoRpc)
 
 		background("sendService.Run", errC, sendService.Run)
 
@@ -474,6 +476,24 @@ func checkSamoscoinSetup(cfg config.Config) error {
 	conn, err := net.Dial("tcp", cfg.Samosnode.RPCAddress)
 	if err != nil {
 		return fmt.Errorf("connect to samoscoin node %s failed: %v", cfg.Samosnode.RPCAddress, err)
+	}
+
+	conn.Close()
+
+	return nil
+}
+
+// checks spaco token setups
+func checkSpacoTokenSetup(cfg config.Config) error {
+	// check whether the skycoin wallet file does exist
+	if _, err := os.Stat(cfg.Spaconode.WalletPath); os.IsNotExist(err) {
+		return fmt.Errorf("spaco token wallet file: %s does not exist", cfg.Spaconode.WalletPath)
+	}
+
+	// test if skycoin node rpc service is reachable
+	conn, err := net.Dial("tcp", cfg.Spaconode.RPCAddress)
+	if err != nil {
+		return fmt.Errorf("connect to spaco token node %s failed: %v", cfg.Spaconode.RPCAddress, err)
 	}
 
 	conn.Close()

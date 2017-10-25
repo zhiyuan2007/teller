@@ -10,9 +10,13 @@
     "max_bind": 5,
     "session_write_bufer_size": 100,
     "monitor_address": "127.0.0.1:7711",
-    "samosnode": {
+    "samosnode": {//samos token
         "rpc_address": "127.0.0.1:8431",
         "wallet_path": "/Users/liuguirong/.samoscoin/wallets/origin1.wlt"
+    },
+    "sponode": {//spaco token
+        "rpc_address": "127.0.0.1:8620",
+        "wallet_path": "/Users/liuguirong/.samoscoin/wallets/origin1.wlt"        
     },
     "skynode": {
         "rpc_address": "127.0.0.1:8431",
@@ -37,6 +41,9 @@
     "sky_sender": {
         "request_buffer_size": 1024
     },
-    "support_cointypes": ["bitcoint", "skycoin", "ethcoin"],
+    "spo_sender": {
+        "request_buffer_size": 1024        
+    },
+    "support_cointypes": ["bitcoin", "skycoin", "ethcoin"],
     "ethurl" : "http://121.010022.cn:8545"
 }
