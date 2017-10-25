@@ -11,13 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"strconv"
+
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/sirupsen/logrus"
 	"github.com/skycoin/skycoin/src/api/webrpc"
 	"github.com/skycoin/skycoin/src/visor"
-	"github.com/skycoin/teller/src/sender"
-	"strconv"
+	"github.com/spaco/teller/src/sender"
 )
 
 var (

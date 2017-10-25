@@ -19,9 +19,9 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/skycoin/skycoin/src/cipher"
-	"github.com/skycoin/teller/src/exchange"
-	"github.com/skycoin/teller/src/util/httputil"
-	"github.com/skycoin/teller/src/util/logger"
+	"github.com/spaco/teller/src/exchange"
+	"github.com/spaco/teller/src/util/httputil"
+	"github.com/spaco/teller/src/util/logger"
 )
 
 const (

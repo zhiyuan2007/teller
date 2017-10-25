@@ -5,7 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/skycoin/teller/src/exchange"
+	"github.com/spaco/teller/src/exchange"
 )
 
 var (
