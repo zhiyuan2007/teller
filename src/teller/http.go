@@ -343,16 +343,16 @@ type UnifiedResponse struct {
 	// Error      string `json:"error,omitempty"`
 }
 
-// BindResponse http response for /api/bind
+// BindResponse http response for /api/bind,adjust for front
 type BindResponse struct {
-	CoinAddress string `json:"address,omitempty"`
-	CoinType    string `json:"coin_type"`
+	CoinAddress string `json:"tokenAddress,omitempty"`
+	CoinType    string `json:"tokenType"`
 }
 
 type bindRequest struct {
 	Address      string `json:"address"`
-	PlanCoinType string `json:"plan_coin_type"`
-	CoinType     string `json:"coin_type"`
+	PlanCoinType string `json:"planTokenType"`
+	CoinType     string `json:"tokenType"`
 }
 
 func makeUnifiedHTTPResponse(code int, data interface{}, errmsg string) UnifiedResponse {
@@ -404,11 +404,11 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 		}
 
 		if bindReq.PlanCoinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing plan_coin_type"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing planTokenType"))
 			return
 		}
 		if bindReq.CoinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing coin_type"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing tokenType"))
 			return
 		}
 
