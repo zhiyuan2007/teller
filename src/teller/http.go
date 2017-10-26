@@ -404,8 +404,8 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 		}
 
 		if bindReq.PlanCoinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing planTokenType"))
-			return
+			//	errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing planTokenType"))
+			//	return
 		}
 		if bindReq.CoinType == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing tokenType"))
@@ -456,7 +456,8 @@ type StatusResponse struct {
 // Method: GET
 // URI: /api/status
 // Args:
-//     skyaddr
+//     address
+//     tokenType
 func StatusHandler(hs *httpServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -468,16 +469,16 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 
 		address := r.URL.Query().Get("address")
 		if address == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing spo addr"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing address"))
 			return
 		}
-		coinType := r.URL.Query().Get("coin_type")
+		coinType := r.URL.Query().Get("tokenType")
 		if coinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing coin_type"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing tokenType"))
 			return
 		}
 
-		log = log.WithField("skyAddr", address)
+		log = log.WithField("address", address)
 		ctx = logger.WithContext(ctx, log)
 		r = r.WithContext(ctx)
 
