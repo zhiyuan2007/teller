@@ -112,6 +112,12 @@ func run() error {
 	startAt := flag.String("start-time", "", "Don't process API requests until after this timestamp (RFC3339 format)")
 	thrMax := flag.Int64("throttle-max", 1000, "max allowd per ip in specific duration")
 	thrDur := flag.Int64("throttle-duration", int64(time.Minute), "throttle duration")
+	btcInitialScanHeight := flag.Int64("btc-scan-height", 0, "initial BTC blockchain scan height")
+	btcConfirmationsRequired := flag.Int64("btc-confirmations-required", 0, "number of confirmations to wait for BTC deposits")
+	skyInitialScanHeight := flag.Int64("sky-scan-height", 0, "initial SKY blockchain scan height")
+	skyConfirmationsRequired := flag.Int64("sky-confirmations-required", 0, "number of confirmations to wait for SKY deposits")
+	ethInitialScanHeight := flag.Int64("eth-scan-height", 0, "initial ETH blockchain scan height")
+	ethConfirmationsRequired := flag.Int64("eth-confirmations-required", 0, "number of confirmations to wait for ETH deposits")
 
 	flag.Parse()
 
@@ -245,8 +251,10 @@ func run() error {
 
 		// create scan service
 		btcScanner, err = scanner.NewBTCScanner(log, db, btcrpc, scanner.Config{
-			ScanPeriod: cfg.Btcscan.CheckPeriod,
-			CoinTypes:  cfg.CoinTypes,
+			ScanPeriod:            cfg.Btcscan.CheckPeriod,
+			CoinTypes:             cfg.CoinTypes,
+			ConfirmationsRequired: *btcConfirmationsRequired,
+			InitialScanHeight:     *btcInitialScanHeight,
 		})
 		if err != nil {
 			log.WithError(err).Error("Open scan service failed")
@@ -257,8 +265,10 @@ func run() error {
 
 		// create scan service
 		skyScanner, err = scanner.NewSKYScanner(log, db, skyrpc, scanner.Config{
-			ScanPeriod: cfg.Btcscan.CheckPeriod,
-			CoinTypes:  cfg.CoinTypes,
+			ScanPeriod:            cfg.Btcscan.CheckPeriod,
+			CoinTypes:             cfg.CoinTypes,
+			ConfirmationsRequired: *skyConfirmationsRequired,
+			InitialScanHeight:     *skyInitialScanHeight,
 		})
 		if err != nil {
 			log.WithError(err).Error("Open scan service failed")
@@ -268,8 +278,10 @@ func run() error {
 		background("skyScanner.Run", errC, skyScanner.Run)
 
 		ethScanner, err = scanner.NewETHScanner(log, db, cfg.Ethurl, scanner.Config{
-			ScanPeriod: cfg.Btcscan.CheckPeriod,
-			CoinTypes:  cfg.CoinTypes,
+			ScanPeriod:            cfg.Btcscan.CheckPeriod,
+			CoinTypes:             cfg.CoinTypes,
+			ConfirmationsRequired: *ethConfirmationsRequired,
+			InitialScanHeight:     *ethInitialScanHeight,
 		})
 		if err != nil {
 			log.WithError(err).Error("Open scan service failed")
