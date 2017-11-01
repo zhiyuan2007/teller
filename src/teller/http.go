@@ -19,9 +19,9 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/skycoin/skycoin/src/cipher"
-	"github.com/skycoin/teller/src/exchange"
-	"github.com/skycoin/teller/src/util/httputil"
-	"github.com/skycoin/teller/src/util/logger"
+	"github.com/spaco/teller/src/exchange"
+	"github.com/spaco/teller/src/util/httputil"
+	"github.com/spaco/teller/src/util/logger"
 )
 
 const (
@@ -343,16 +343,16 @@ type UnifiedResponse struct {
 	// Error      string `json:"error,omitempty"`
 }
 
-// BindResponse http response for /api/bind
+// BindResponse http response for /api/bind,adjust for front
 type BindResponse struct {
-	BtcAddress string `json:"address,omitempty"`
-	CoinType   string `json:"coin_type"`
+	CoinAddress string `json:"tokenAddress,omitempty"`
+	CoinType    string `json:"tokenType"`
 }
 
 type bindRequest struct {
-	SkyAddr      string `json:"address"`
-	PlanCoinType string `json:"plan_coin_type"`
-	CoinType     string `json:"coin_type"`
+	Address      string `json:"address"`
+	PlanCoinType string `json:"planTokenType"`
+	CoinType     string `json:"tokenType"`
 }
 
 func makeUnifiedHTTPResponse(code int, data interface{}, errmsg string) UnifiedResponse {
@@ -398,23 +398,23 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 		ctx = logger.WithContext(ctx, log)
 		r = r.WithContext(ctx)
 
-		if bindReq.SkyAddr == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing skyaddr"))
+		if bindReq.Address == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing address"))
 			return
 		}
 
 		if bindReq.PlanCoinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing plan_coin_type"))
-			return
+			//	errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing planTokenType"))
+			//	return
 		}
 		if bindReq.CoinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing coin_type"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing tokenType"))
 			return
 		}
 
 		log.Info()
 
-		if !verifySkycoinAddress(ctx, w, bindReq.SkyAddr) {
+		if !verifySkycoinAddress(ctx, w, bindReq.Address) {
 			return
 		}
 
@@ -424,7 +424,7 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 
 		log.Info("Calling service.BindAddress")
 
-		btcAddr, err := hs.service.BindAddress(bindReq.SkyAddr, bindReq.CoinType)
+		coinAddr, err := hs.service.BindAddress(bindReq.Address, bindReq.CoinType)
 		if err != nil {
 			// TODO -- these could be internal server error, gateway error
 			log.WithError(err).Error("service.BindAddress failed")
@@ -432,13 +432,13 @@ func BindHandler(hs *httpServer) http.HandlerFunc {
 			return
 		}
 
-		log = log.WithField("btcAddr", btcAddr)
+		log = log.WithField("coinAddr", coinAddr)
 		ctx = logger.WithContext(ctx, log)
 		r = r.WithContext(ctx)
 
-		log.Info("Bound sky and btc addresses")
+		log.Info("Bound " + bindReq.CoinType + " and " + bindReq.PlanCoinType + " addresses")
 
-		tmp := BindResponse{BtcAddress: btcAddr, CoinType: bindReq.CoinType}
+		tmp := BindResponse{CoinAddress: coinAddr, CoinType: bindReq.CoinType}
 		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
 
 		if err := httputil.JSONResponse(w, unifiedres); err != nil {
@@ -456,7 +456,8 @@ type StatusResponse struct {
 // Method: GET
 // URI: /api/status
 // Args:
-//     skyaddr
+//     address
+//     tokenType
 func StatusHandler(hs *httpServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -466,24 +467,24 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 			return
 		}
 
-		skyAddr := r.URL.Query().Get("address")
-		if skyAddr == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing skyaddr"))
+		address := r.URL.Query().Get("address")
+		if address == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing address"))
 			return
 		}
-		coinType := r.URL.Query().Get("coin_type")
+		coinType := r.URL.Query().Get("tokenType")
 		if coinType == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing coin_type"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing tokenType"))
 			return
 		}
 
-		log = log.WithField("skyAddr", skyAddr)
+		log = log.WithField("address", address)
 		ctx = logger.WithContext(ctx, log)
 		r = r.WithContext(ctx)
 
 		log.Info()
 
-		if !verifySkycoinAddress(ctx, w, skyAddr) {
+		if !verifySkycoinAddress(ctx, w, address) {
 			return
 		}
 
@@ -493,7 +494,7 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 
 		log.Info("Sending StatusRequest to teller")
 
-		depositStatuses, err := hs.service.GetDepositStatuses(skyAddr, coinType)
+		depositStatuses, err := hs.service.GetDepositStatuses(address, coinType)
 		if err != nil {
 			// TODO -- these could be internal server error, gateway error
 			log.WithError(err).Error("service.GetDepositStatuses failed")
@@ -551,12 +552,12 @@ func verifySkycoinAddress(ctx context.Context, w http.ResponseWriter, skyAddr st
 	log := logger.FromContext(ctx)
 
 	if _, err := cipher.DecodeBase58Address(skyAddr); err != nil {
-		msg := fmt.Sprintf("Invalid skycoin address: %v", err)
+		msg := fmt.Sprintf("Invalid spo address: %v", err)
 		errorResponse(ctx, w, http.StatusBadRequest, errors.New(msg))
 		log.WithFields(logrus.Fields{
 			"status":  http.StatusBadRequest,
 			"skyAddr": skyAddr,
-		}).WithError(err).Info("Invalid skycoin address")
+		}).WithError(err).Info("Invalid spo address")
 		return false
 	}
 
