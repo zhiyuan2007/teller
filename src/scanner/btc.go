@@ -121,21 +121,11 @@ func (s *BTCScanner) Run() error {
 		"blockHash":   hash,
 	})
 
-	if height == 0 {
-		// the first time the bot start
-		// get the best block
-		block, err := s.getBestBlock()
-		if err != nil {
-			return err
-		}
-
-		if err := s.scanBlock(block); err != nil {
-			return fmt.Errorf("Scan block %s failed: %v", block.Hash, err)
-		}
-
-		hash = block.Hash
-		log = log.WithField("blockHash", hash)
+	if height < s.cfg.InitialScanHeight {
+		height = s.cfg.InitialScanHeight
 	}
+
+	currentheight := height
 
 	wg.Add(1)
 	errC := make(chan error, 1)
@@ -143,9 +133,33 @@ func (s *BTCScanner) Run() error {
 		defer wg.Done()
 
 		for {
-			nextBlock, err := s.getNextBlock(hash)
+			// Check for necessary confirmations
+			bestHeight, err := s.btcClient.GetBlockCount()
 			if err != nil {
-				log.WithError(err).Error("getNextBlock failed")
+				log.WithError(err).Error("btcClient.GetBlockCount failed")
+				if wait() != nil {
+					return
+				}
+
+				continue
+			}
+
+			log = log.WithField("bestHeight", bestHeight)
+
+			// If not enough confirmations exist for this block, wait
+			if currentheight+s.cfg.ConfirmationsRequired > bestHeight {
+				log.Info("Not enough confirmations, waiting")
+				select {
+				case <-s.quit:
+					return
+				case <-time.After(time.Duration(s.cfg.ScanPeriod) * time.Second):
+					continue
+				}
+			}
+
+			// get the best block
+			nextBlock, err := s.getBlockAtHeight(currentheight)
+			if err != nil {
 				select {
 				case <-s.quit:
 					return
@@ -154,6 +168,17 @@ func (s *BTCScanner) Run() error {
 					return
 				}
 			}
+			//nextBlock, err := s.getNextBlock(hash)
+			//if err != nil {
+			//log.WithError(err).Error("getNextBlock failed")
+			//select {
+			//case <-s.quit:
+			//return
+			//default:
+			//errC <- err
+			//return
+			//}
+			//}
 
 			if nextBlock == nil {
 				log.Debug("No new block to s...")
@@ -167,6 +192,7 @@ func (s *BTCScanner) Run() error {
 
 			hash = nextBlock.Hash
 			height = nextBlock.Height
+			currentheight := height + 1
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
@@ -279,6 +305,25 @@ func scanBTCBlock(s *BTCScanner, block *btcjson.GetBlockVerboseResult, depositAd
 // AddScanAddress adds new scan address
 func (s *BTCScanner) AddScanAddress(addr string) error {
 	return s.store.addScanAddress(addr, coinType)
+}
+
+// getBlockAtHeight returns that block at a specific height
+func (s *BTCScanner) getBlockAtHeight(height int64) (*btcjson.GetBlockVerboseResult, error) {
+	log := s.log.WithField("blockHeight", height)
+
+	hash, err := s.btcClient.GetBlockHash(height)
+	if err != nil {
+		log.WithError(err).Error("btcClient.GetBlockHash failed")
+		return nil, err
+	}
+
+	block, err := s.btcClient.GetBlockVerbose(hash)
+	if err != nil {
+		log.WithError(err).Error("btcClient.GetBlockVerboseTx failed")
+		return nil, err
+	}
+
+	return block, nil
 }
 
 // GetBestBlock returns the hash and height of the block in the longest (best)
