@@ -21,7 +21,7 @@ type BtcAddrGenerator interface {
 // Exchanger provids apis to interact with exchange service
 type Exchanger interface {
 	BindAddress(cAddr, skyAddr, ct string) error
-	GetDepositStatuses(address string) ([]exchange.DepositStatus, error)
+	GetDepositStatuses(address, ct string) ([]exchange.DepositStatus, error)
 	// Returns the number of btc address the skycoin address binded
 	BindNum(skyAddr string) (int, error)
 }
@@ -158,11 +158,11 @@ func (s *service) BindAddress(samosAddr, coinType string) (string, error) {
 func (s *service) GetDepositStatuses(address, coinType string) ([]exchange.DepositStatus, error) {
 	switch coinType {
 	case "bitcoin":
-		return s.exchanger.GetDepositStatuses(address)
+		return s.exchanger.GetDepositStatuses(address, coinType)
 	case "skycoin":
-		return s.exchanger.GetDepositStatuses(address)
+		return s.exchanger.GetDepositStatuses(address, coinType)
 	case "ethcoin":
-		return s.exchanger.GetDepositStatuses(address)
+		return s.exchanger.GetDepositStatuses(address, coinType)
 	}
 
 	return []exchange.DepositStatus{}, errors.New("not support cointype")

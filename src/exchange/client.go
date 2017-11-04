@@ -19,8 +19,8 @@ func (ec *Client) BindAddress(cAddr, skyAddr, ct string) error {
 }
 
 // GetDepositStatuses returns deamon.DepositStatus array of given skycoin address
-func (ec *Client) GetDepositStatuses(skyAddr string) ([]DepositStatus, error) {
-	return ec.s.getDepositStatuses(skyAddr)
+func (ec *Client) GetDepositStatuses(skyAddr, ct string) ([]DepositStatus, error) {
+	return ec.s.getDepositStatuses(skyAddr, ct)
 }
 
 // BindNum returns the number of btc address the given sky address binded

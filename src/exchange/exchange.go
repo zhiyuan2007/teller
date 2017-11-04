@@ -482,9 +482,11 @@ func (s *Service) bindAddress(Addr, skyAddr, ct string) error {
 
 // DepositStatus json struct for deposit status
 type DepositStatus struct {
-	Seq      uint64 `json:"seq"`
-	UpdateAt int64  `json:"update_at"`
-	Status   string `json:"status"`
+	Seq       uint64 `json:"seq"`
+	UpdateAt  int64  `json:"update_at"`
+	Address   string `json:"address"`
+	TokenType string `json:"tokenType"`
+	Status    string `json:"status"`
 }
 
 // DepositStatusDetail deposit status detail info
@@ -497,7 +499,7 @@ type DepositStatusDetail struct {
 	Txid       string `json:"txid"`
 }
 
-func (s *Service) getDepositStatuses(skyAddr string) ([]DepositStatus, error) {
+func (s *Service) getDepositStatuses(skyAddr, ct string) ([]DepositStatus, error) {
 	dpis, err := s.store.GetDepositInfoOfSkyAddress(skyAddr)
 	if err != nil {
 		return []DepositStatus{}, err
@@ -506,9 +508,11 @@ func (s *Service) getDepositStatuses(skyAddr string) ([]DepositStatus, error) {
 	dss := make([]DepositStatus, 0, len(dpis))
 	for _, dpi := range dpis {
 		dss = append(dss, DepositStatus{
-			Seq:      dpi.Seq,
-			UpdateAt: dpi.UpdatedAt,
-			Status:   dpi.Status.String(),
+			Seq:       dpi.Seq,
+			Address:   dpi.BtcAddress,
+			TokenType: ct,
+			UpdateAt:  dpi.UpdatedAt,
+			Status:    dpi.Status.String(),
 		})
 	}
 	return dss, nil
