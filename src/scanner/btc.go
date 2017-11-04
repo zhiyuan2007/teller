@@ -137,9 +137,6 @@ func (s *BTCScanner) Run() error {
 			bestHeight, err := s.btcClient.GetBlockCount()
 			if err != nil {
 				log.WithError(err).Error("btcClient.GetBlockCount failed")
-				if wait() != nil {
-					return
-				}
 
 				continue
 			}
@@ -192,7 +189,7 @@ func (s *BTCScanner) Run() error {
 
 			hash = nextBlock.Hash
 			height = nextBlock.Height
-			currentheight := height + 1
+			currentheight = height + 1
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
