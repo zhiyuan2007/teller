@@ -124,22 +124,19 @@ func (s *ETHScanner) Run() error {
 		"blockHash":   hash,
 	})
 
-	seq := height
-	if height == 0 {
-		// the first time the bot start
-		// get the best block
-		block, err := s.getBestBlock()
+	currentheight := height
+
+	if currentheight < s.cfg.InitialScanHeight {
+		currentheight = s.cfg.InitialScanHeight
+	}
+
+	if currentheight == 0 {
+		bestHeight, err := s.getBlockCount()
 		if err != nil {
-			return err
+			log.WithError(err).Error("btcClient.GetBlockCount failed")
+		} else {
+			currentheight = bestHeight - 1
 		}
-
-		if err := s.scanBlock(block); err != nil {
-			return fmt.Errorf("Scan block %s failed: %v", block.HashNoNonce().String(), err)
-		}
-
-		hash = block.HashNoNonce().String()
-		seq = int64(block.NumberU64())
-		log = log.WithField("blockHash", hash)
 	}
 
 	wg.Add(1)
@@ -148,9 +145,30 @@ func (s *ETHScanner) Run() error {
 		defer wg.Done()
 
 		for {
-			nextBlock, err := s.getNextBlock(uint64(seq))
+			bestHeight, err := s.getBlockCount()
 			if err != nil {
-				log.WithError(err).Error("getNextBlock failed")
+				log.WithError(err).Error("btcClient.GetBlockCount failed")
+				select {
+				case <-s.quit:
+					return
+				case <-time.After(time.Duration(s.cfg.ScanPeriod) * time.Second):
+					continue
+				}
+			}
+
+			// If not enough confirmations exist for this block, wait
+			if currentheight+s.cfg.ConfirmationsRequired > bestHeight {
+				log.Debug("Not enough confirmations, waiting")
+				select {
+				case <-s.quit:
+					return
+				case <-time.After(time.Duration(s.cfg.ScanPeriod) * time.Second):
+					continue
+				}
+			}
+			currBlock, err := s.getBlock(uint64(currentheight))
+			if err != nil {
+				log.WithError(err).Error("getBlock failed")
 				select {
 				case <-s.quit:
 					return
@@ -160,7 +178,7 @@ func (s *ETHScanner) Run() error {
 				}
 			}
 
-			if nextBlock == nil {
+			if currBlock == nil {
 				log.Debug("No new block to s...")
 				select {
 				case <-s.quit:
@@ -170,24 +188,25 @@ func (s *ETHScanner) Run() error {
 				}
 			}
 
-			hash = nextBlock.HashNoNonce().String()
-			height = int64(nextBlock.NumberU64())
-			seq = height
+			hash = currBlock.HashNoNonce().String()
+			height = int64(currBlock.NumberU64())
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
 			})
 
 			log.Debugf("Scanned new block %u\n", height)
-			if err := s.scanBlock(nextBlock); err != nil {
+			if err := s.scanBlock(currBlock); err != nil {
 				select {
 				case <-s.quit:
 					return
 				default:
-					errC <- fmt.Errorf("Scan block %s failed: %v", nextBlock.HashNoNonce().String(), err)
+					errC <- fmt.Errorf("Scan block %s failed: %v", currBlock.HashNoNonce().String(), err)
 					return
 				}
 			}
+			fmt.Printf("current height: %d, confirm %d, block count %d\n", currentheight, s.cfg.ConfirmationsRequired, bestHeight)
+			currentheight = height + 1
 		}
 	}()
 
@@ -273,6 +292,23 @@ func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]D
 // AddScanAddress adds new scan address
 func (s *ETHScanner) AddScanAddress(addr string) error {
 	return s.store.addScanAddress(addr, ecoinType)
+}
+
+// GetBestBlock returns the hash and height of the block in the longest (best)
+// chain.
+func (s *ETHScanner) getBlockCount() (int64, error) {
+	var bn string
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.ethClient.CallContext(ctx, &bn, "eth_blockNumber"); err != nil {
+		return 0, err
+	}
+	bnRealStr := bn[2:]
+	blockNum, err := strconv.ParseInt(bnRealStr, 16, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int64(blockNum), nil
 }
 
 // GetBestBlock returns the hash and height of the block in the longest (best)

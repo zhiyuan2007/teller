@@ -113,11 +113,11 @@ func run() error {
 	thrMax := flag.Int64("throttle-max", 1000, "max allowd per ip in specific duration")
 	thrDur := flag.Int64("throttle-duration", int64(time.Minute), "throttle duration")
 	btcInitialScanHeight := flag.Int64("btc-scan-height", 0, "initial BTC blockchain scan height")
-	btcConfirmationsRequired := flag.Int64("btc-confirmations-required", 0, "number of confirmations to wait for BTC deposits")
+	btcConfirmationsRequired := flag.Int64("btc-confirmations-required", 3, "number of confirmations to wait for BTC deposits")
 	skyInitialScanHeight := flag.Int64("sky-scan-height", 0, "initial SKY blockchain scan height")
-	skyConfirmationsRequired := flag.Int64("sky-confirmations-required", 0, "number of confirmations to wait for SKY deposits")
+	skyConfirmationsRequired := flag.Int64("sky-confirmations-required", 6, "number of confirmations to wait for SKY deposits")
 	ethInitialScanHeight := flag.Int64("eth-scan-height", 0, "initial ETH blockchain scan height")
-	ethConfirmationsRequired := flag.Int64("eth-confirmations-required", 0, "number of confirmations to wait for ETH deposits")
+	ethConfirmationsRequired := flag.Int64("eth-confirmations-required", 12, "number of confirmations to wait for ETH deposits")
 
 	flag.Parse()
 

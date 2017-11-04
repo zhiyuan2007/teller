@@ -15,6 +15,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcrpcclient"
 	"github.com/btcsuite/btcutil"
 	"github.com/sirupsen/logrus"
 )
@@ -33,14 +34,14 @@ const (
 type BTCScanner struct {
 	log       logrus.FieldLogger
 	cfg       Config
-	btcClient BtcRPCClient
+	btcClient *btcrpcclient.Client
 	store     *store
 	depositC  chan DepositNote // deposit value channel
 	quit      chan struct{}
 }
 
 // NewBTCScanner creates scanner instance
-func NewBTCScanner(log logrus.FieldLogger, db *bolt.DB, btc BtcRPCClient, cfg Config) (*BTCScanner, error) {
+func NewBTCScanner(log logrus.FieldLogger, db *bolt.DB, btc *btcrpcclient.Client, cfg Config) (*BTCScanner, error) {
 	s, err := newStore(db, coinType)
 	if err != nil {
 		return nil, err
@@ -121,11 +122,21 @@ func (s *BTCScanner) Run() error {
 		"blockHash":   hash,
 	})
 
+	fmt.Printf("history height %d, init height %d\n", height, s.cfg.InitialScanHeight)
+
 	if height < s.cfg.InitialScanHeight {
 		height = s.cfg.InitialScanHeight
 	}
 
 	currentheight := height
+	if currentheight == 0 {
+		bestHeight, err := s.btcClient.GetBlockCount()
+		if err != nil {
+			log.WithError(err).Error("btcClient.GetBlockCount failed")
+		} else {
+			currentheight = bestHeight - 1
+		}
+	}
 
 	wg.Add(1)
 	errC := make(chan error, 1)
@@ -137,15 +148,19 @@ func (s *BTCScanner) Run() error {
 			bestHeight, err := s.btcClient.GetBlockCount()
 			if err != nil {
 				log.WithError(err).Error("btcClient.GetBlockCount failed")
-
-				continue
+				select {
+				case <-s.quit:
+					return
+				case <-time.After(time.Duration(s.cfg.ScanPeriod) * time.Second):
+					continue
+				}
 			}
 
 			log = log.WithField("bestHeight", bestHeight)
 
 			// If not enough confirmations exist for this block, wait
 			if currentheight+s.cfg.ConfirmationsRequired > bestHeight {
-				log.Info("Not enough confirmations, waiting")
+				log.Debug("Not enough confirmations, waiting")
 				select {
 				case <-s.quit:
 					return
@@ -189,7 +204,6 @@ func (s *BTCScanner) Run() error {
 
 			hash = nextBlock.Hash
 			height = nextBlock.Height
-			currentheight = height + 1
 			log = log.WithFields(logrus.Fields{
 				"blockHeight": height,
 				"blockHash":   hash,
@@ -205,6 +219,8 @@ func (s *BTCScanner) Run() error {
 					return
 				}
 			}
+			fmt.Printf("current height: %d, confirm %d, block count %d\n", currentheight, s.cfg.ConfirmationsRequired, bestHeight)
+			currentheight = height + 1
 		}
 	}()
 
@@ -273,7 +289,7 @@ func scanBTCBlock(s *BTCScanner, block *btcjson.GetBlockVerboseResult, depositAd
 		}
 		tx, err := s.getRawTransactionVerbose(txid)
 		if err != nil {
-			fmt.Printf("get getRawTransactionVerbose failed: %s\n", txidstr)
+			fmt.Printf("get getRawTransactionVerbose failed: %s, err: %s\n", txidstr, err.Error())
 			continue
 		}
 		for _, v := range tx.Vout {
