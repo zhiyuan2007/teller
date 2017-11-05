@@ -280,7 +280,7 @@ func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]D
 				Address: a,
 				Value:   amt,
 				Height:  int64(block.NumberU64()),
-				Tx:      tx.String(),
+				Tx:      tx.Hash().String(),
 				N:       uint32(i),
 			})
 		}

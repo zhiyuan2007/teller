@@ -21,7 +21,7 @@ import (
 
 const satoshiPerBTC int64 = 1e8
 const dropletsPerSPA int64 = 1e6
-const weiPerEth int64 = 1e16
+const weiPerEth uint64 = 1e18
 
 // SkySender provids apis for sending skycoin
 type SkySender interface {
@@ -107,7 +107,7 @@ func calculateSkyValueForEth(wei, skyPerEth int64) (uint64, error) {
 
 	eth := decimal.New(wei, 0)
 	ethToWei := decimal.New(weiPerEth, 0)
-	eth = eth.DivRound(ethToWei, 16)
+	eth = eth.DivRound(ethToWei, 18)
 
 	rate := decimal.New(skyPerEth, 0)
 
@@ -259,7 +259,7 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 
 	err = s.HandleErrorDeposit(dv, btcTxIndex, err)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if di.Status >= StatusWaitConfirm {
@@ -319,7 +319,7 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		}
 	case "ethcoin":
 		log = log.WithField("skyRate", s.cfg.EthRate)
-		skyAmt, err = calculateSkyValueForSpa(dv.Value, s.cfg.EthRate)
+		skyAmt, err = calculateSkyValueForEth(dv.Value, s.cfg.EthRate)
 		if err != nil {
 			log.WithError(err).Error("calculateSkyValue failed")
 			return nil
