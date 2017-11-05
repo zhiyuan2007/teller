@@ -258,7 +258,7 @@ func scanSKYBlock(s *SKYScanner, block *visor.ReadableBlock, depositAddrs []stri
 	var dv []DepositValue
 	for _, tx := range block.Body.Transactions {
 		for i, v := range tx.Out {
-			amt, ee := strconv.Atoi(v.Coins)
+			amt, ee := strconv.ParseFloat(v.Coins, 16)
 			if ee != nil {
 				fmt.Printf("------wrong coin value %s\n-----", v.Coins)
 				continue
