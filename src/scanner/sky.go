@@ -141,6 +141,25 @@ func (s *SKYScanner) Run() error {
 		defer wg.Done()
 
 		for {
+			//blockcount, err := s.skyClient.GetBlockCount()
+			//if err != nil {
+			//log.WithError(err).Error("getNextBlock failed")
+			//select {
+			//case <-s.quit:
+			//return
+			//default:
+			//errC <- err
+			//return
+			//}
+			//}
+			//if uint64(seq+1) > blockcount {
+			//select {
+			//case <-s.quit:
+			//return
+			//case <-time.After(time.Duration(s.cfg.ScanPeriod) * time.Second):
+			//continue
+			//}
+			//}
 			nextBlock, err := s.getNextBlock(uint64(seq))
 			if err != nil {
 				log.WithError(err).Error("getNextBlock failed")

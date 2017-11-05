@@ -73,9 +73,15 @@ func (c *RPC) GetBlocks(start, end uint64) (*visor.ReadableBlocks, error) {
 
 	return &blocks, nil
 }
+func (c *RPC) GetBlockCount() (uint64, error) {
+	st, err := c.rpcClient.GetStatus()
+	if err != nil {
+		return 0, err
+	}
+	return st.BlockNum, nil
+}
 
 func (c *RPC) GetBlocksBySeq(seq uint64) (*visor.ReadableBlock, error) {
-
 	ss := []uint64{seq}
 	blocks := visor.ReadableBlocks{}
 
