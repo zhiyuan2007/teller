@@ -3,9 +3,11 @@ package scanner
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/boltdb/bolt"
 	"github.com/spaco/teller/src/util/dbutil"
+	"github.com/spaco/teller/src/util/sms"
 )
 
 var (
@@ -227,6 +229,21 @@ func (s *store) pushDepositValueTx(tx *bolt.Tx, dv DepositValue, ct string) erro
 	} else if hasKey {
 		return DepositValueExistsErr{}
 	}
+	var coinValue float64
+	coinType := ct
+	switch ct {
+	case "bitcoin":
+		coinValue = float64(dv.Value) / 1e8
+	case "skycoin":
+		coinValue = float64(dv.Value) / 1e6
+	case "ethcoin":
+		coinValue = float64(dv.Value) / 1e18
+	default:
+		coinValue = 0.0
+		coinType = "unknown"
+	}
+	s32 := strconv.FormatFloat(coinValue, 'f', -1, 32)
+	sms.Sendmsg(dv.Address, s32, coinType)
 
 	// Save deposit value
 	if err := dbutil.PutBucketValue(tx, depositValueBkt, key, dv); err != nil {

@@ -21,7 +21,7 @@ import (
 
 const satoshiPerBTC int64 = 1e8
 const dropletsPerSPA int64 = 1e6
-const weiPerEth uint64 = 1e18
+const weiPerEth int64 = 1e18
 
 // SkySender provids apis for sending skycoin
 type SkySender interface {
