@@ -5,11 +5,13 @@ package exchange
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
+	"github.com/spaco/teller/src/util/sms"
 
 	"github.com/skycoin/skycoin/src/daemon"
 	"github.com/skycoin/skycoin/src/util/droplet"
@@ -343,7 +345,9 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		log.Warn("exhange.Service quit")
 		return errors.New("exchange.Service quit")
 	}
-
+	coinValue := float64(skyAmt) / 1e6
+	s32 := strconv.FormatFloat(coinValue, 'f', -1, 32)
+	sms.Sendmsg(skyAddr, s32, "spocoin")
 	log = log.WithField("response", rsp)
 
 	if rsp.Err != "" {
