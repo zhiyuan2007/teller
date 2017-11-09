@@ -21,44 +21,22 @@ When a new release is published, `develop` will be merged to `master` then tagge
 * Have btcd started
 * Have skycoin node started
 
-### Summary of setup for development without btcd or skycoind
+### Install teller and start
+最简单的方法：
+进到目录：spaco/teller/cmd/teller
+运行命令：go build
+如果缺少哪个库，则运行go get xxxx,
+比如缺少 skycoin则运行go get github.com/skycoin/skycoin
+
+### Summary of setup 
 
 ```bash
 # Generate btc_addresses.json file. 'foobar' is an arbitrary seed, and 10 is an arbitrary number of addresses to generate
 go run cmd/tool/tool.go -json newbtcaddress foobar 10 > /tmp/btc_addresses.json
 
-# Run proxy, a pubkey will be printed to stdout, copy it
-go run cmd/proxy/proxy.go
-
-# In a new terminal, run teller in dummy mode, provide pubkey from proxy stdout, point addresses to addr file
-cd cmd/teller/
-go run teller.go -proxy-pubkey=<proxy pubkey> -dummy -btc-addrs=/tmp/btc_addresses.json
-```
-
-Proxy API is available on `localhost:7071`. API has two methods, `/api/bind` and `/api/status`, with one query arg `skyaddr`, e.g.:
-
-```bash
-wget http://localhost:7071/api/bind?skyaddr=<skycoin addr>
-```
-
-### Start teller-proxy
-
-*Note: the proxy must be run from the repo root, in order to serve static content from `./web/dist`*
-
-```bash
-make proxy
-```
-
-Once the proxy starts, it will show a `pubkey` value in the log.
-Use this for the `-proxy-pubkey` argument in `teller`.
-
-```bash
-18:28:49 proxy.go:33: Pubkey: 03583bf0a6cbe7048023be5475aca693e192b4b5570bcc883c50f7d96f0a996eda
-```
-
 ### Start teller
 
-Install `skycoin-cli`
+Install `spo-cli`
 
 ```bash
 make install-skycoin-cli
@@ -76,7 +54,27 @@ add pregenerated bitcoin deposit address list in `btc_addresses.json`.
     ]
 }
 ```
+add pregenerated ethcoin deposit address list in `eth_addresses.json`.
 
+```bash
+{
+    "eth_addresses": [
+        "0x2cf014d432e92685ef1cf7bc7967a4e4debca092",
+        "0xea674fdde714fd979de3edf0f56aa9716b898ec8"
+    ]
+}
+```
+
+add pregenerated skycoin deposit address list in `sky_addresses.json`.
+
+```bash
+{
+    "sky_addresses": [
+        "2do3K1YLMy3Aq6EcPMdncEurP5BfAUdFPJj",
+        "vX7vey11wqagGjXv4znJoGFL2zLgvAK8Dj"
+    ]
+}
+```
 use `tool` to pregenerate bitcoin address list:
 
 ```bash
@@ -102,44 +100,61 @@ go run tool.go -json newbtcaddress 12323 3 > new_btc_addresses.json
 
 
 teller's config is managed in `config.json`, need to set the `wallet_path`
-in `skynode` field to an absolute path of skycoin wallet file, and set up the `btcd`
+in `sponode` field to an absolute path of spocoin wallet file, and set up the `btcd`
 config in `btc_rpc` field, including server address, username, password and
-absolute path to the cert file.
+absolute path to the cert file, ethcoin and skycoin is also.
 
 config.json:
 
-```json
+```
 {
-    "http_address": "127.0.0.1:7070",
+    "http_address": "127.0.0.1:7071",
     "reconnect_time": 5,
     "dial_timeout": 5,
     "ping_timeout": 5,
     "pong_timeout": 10,
-    "exchange_rate": 500,
+    "btc_exchange_rate": 250000,
+    "sky_exchange_rate": 100,
+    "eth_exchange_rate": 10000,
+    "max_bind": 5,
+    "session_write_bufer_size": 100,
+    "monitor_address": "127.0.0.1:7711",
+    "spaconode": {
+        "rpc_address": "127.0.0.1:8431",
+        "wallet_path": "/path/wallets/spo.wlt"
+    },
     "skynode": {
         "rpc_address": "127.0.0.1:6430",
-        "wallet_path": "absolute path to the wallet file"
+        "wallet_path": "/path/wallets/sky.wlt"
     },
     "btc_scan": {
         "check_period": 20,
         "deposit_buffer_size": 1024
     },
     "btc_rpc": {
-        "server": "127.0.0.1:8334",
-        "user": "",
-        "pass": "",
-        "cert": "absolute path to rpc cert file"
+        "server": "127.0.0.1:8822",
+        "user": "testrpc",
+        "pass": "testpasswd",
+        "cert": "/path/btc/btc.conf"
     },
     "sky_sender": {
         "request_buffer_size": 1024
-    }
+    },
+    "spo_sender": {
+        "request_buffer_size": 1024        
+    },
+    "support_cointypes": ["bitcoin", "skycoin", "ethcoin"],
+    "ethurl" : "http://127.0.0.1:8545"
 }
+
 ```
 
 run teller service
+- confirmations-required 确认数
+- scan-height 从指定高度开始扫描
 
 ```bash
-go run teller.go -proxy-pubkey=$the_pubkey_of_proxy
+go run teller.go -cfg config.json  -btc-addrs btc_address.json -sky-addrs sky_address.json  -eth-addrs eth_address.json -btc-confirmations-required 1 -eth-scan-height 4495493
 ```
 
 ## Service apis
@@ -148,7 +163,18 @@ The HTTP API service is provided by the proxy and serve on port 7071 by default.
 
 The API returns JSON for all 200 OK responses.
 
-If the API returns a non-200 response, the response body is the error message, in plain text (not JSON).
+the API returns JSON object format as 
+```
+{
+    "errmsg": "",
+    "code": 0,
+    "data": {
+        "address": "2do3K1YLMy3Aq6EcPMdncEurP5BfAUdFPJj",
+        "coin_type": "skycoin"
+    }
+}
+```
+code = 0 is success, code != 0 is failed
 
 ### Bind
 
@@ -158,24 +184,31 @@ Accept: application/json
 Content-Type: application/json
 URI: /api/bind
 Request Body: {
-    "skyaddr": "..."
+    "address": "..."
+    "plan_coin_type": "spocoin"
+    "tokenType":"[bitcoin|ethcoin|skycoin]"
 }
 ```
 
-Binds a skycoin address to a BTC address. A skycoin address can be bound to
-multiple BTC addresses.  The default maximum number of bound addresses is 5.
+Binds a spocoin address to a BTC address. A spocoin address can be bound to
+multiple BTC addresses.  The default maximum number of bound addresses is 10.
 
 Example:
 
 ```bash
-curl -H  -X POST "Content-Type: application/json" -d '{"skyaddr":"..."}' http://localhost:7071/api/bind
+curl -X POST -H "Content-Type:application/json" -d '{"address":"2AzuN3aqF53vUC2yHqdfMKnw4i8eRrwye71","plan_coin_type":"spocoin","coin_type":"skycoin"}' http://localhost:7071/api/bind/
 ```
 
 response:
 
 ```bash
 {
-    "btc_address": "1Bmp9Kv9vcbjNKfdxCrmL1Ve5n7gvkDoNp"
+    "errmsg": "",
+    "code": 0,
+    "data": {
+        "address": "2do3K1YLMy3Aq6EcPMdncEurP5BfAUdFPJj",
+        "coin_type": "skycoin"
+    }
 }
 ```
 
@@ -188,24 +221,22 @@ URI: /api/status
 Query Args: skyaddr
 ```
 
-Returns statuses of a skycoin address.
+Returns statuses of a spocoin address.
 
-Since a single skycoin address can be bound to multiple BTC addresses the result is in an array.
-The default maximum number of BTC addresses per skycoin address is 5.
-
-We cannot return the BTC address for security reasons so they are numbered and timestamped instead.
+Since a single spocoin address can be bound to multiple BTC addresses the result is in an array.
+The default maximum number of BTC addresses per spocoin address is 5.
 
 Possible statuses are:
 
-* `waiting_deposit` - Skycoin address is bound, no deposit seen on BTC address yet
-* `waiting_send` - BTC deposit detected, waiting to send skycoin out
-* `waiting_confirm` - Skycoin sent out, waiting to confirm the skycoin transaction
+* `waiting_deposit` - Spocoin address is bound, no deposit seen on BTC address yet
+* `waiting_send` - BTC deposit detected, waiting to send spocoin out
+* `waiting_confirm` - Spocoin sent out, waiting to confirm the spocoin transaction
 * `done` - Skycoin transaction confirmed
 
 Example:
 
 ```bash
-curl http://localhost:7071/api/status?skyaddr=t5apgjk4LvV9PQareTPzWkE88o1G5A55FW
+curl http://localhost:7071/api/status?address=2AzuN3aqF53vUC2yHqdfMKnw4i8eRrwye71\&coin_type=bitcoin
 ```
 
 response:
@@ -216,16 +247,22 @@ response:
         {
             "seq": 1,
             "update_at": 1501137828,
+            "address":"ZJHwZfwXrqq49bEKmXXCqjcMTzF8RkQSXm",
+            "tokenType":"bitcoin"
             "status": "done"
         },
         {
             "seq": 2,
             "update_at": 1501128062,
+            "address":"ZJHwZfwXrqq49bEKmXXCqjcMTzF8RkQSXm",
+            "tokenType":"bitcoin"
             "status": "waiting_deposit"
         },
         {
             "seq": 3,
             "update_at": 1501128063,
+            "address":"ZJHwZfwXrqq49bEKmXXCqjcMTzF8RkQSXm",
+            "tokenType":"bitcoin"
             "status": "waiting_deposit"
         },
     ]
