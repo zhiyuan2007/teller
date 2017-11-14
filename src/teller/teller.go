@@ -24,6 +24,8 @@ type Exchanger interface {
 	GetDepositStatuses(address, ct string) ([]exchange.DepositStatus, error)
 	// Returns the number of btc address the skycoin address binded
 	BindNum(skyAddr string) (int, error)
+	SetRate(cointype string, rate int) error
+	GetRate(cointype string) (int, error)
 }
 
 // Config configures Teller
@@ -166,4 +168,11 @@ func (s *service) GetDepositStatuses(address, coinType string) ([]exchange.Depos
 	}
 
 	return []exchange.DepositStatus{}, errors.New("not support cointype")
+}
+func (s *service) SetRate(cointype string, rate int) error {
+	return s.exchanger.SetRate(cointype, rate)
+}
+
+func (s *service) GetRate(cointype string) (int, error) {
+	return s.exchanger.GetRate(cointype)
 }

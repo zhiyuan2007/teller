@@ -6,6 +6,7 @@ package exchange
 import (
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -138,6 +139,7 @@ type Service struct {
 	ethScanner BtcScanner // scanner provides apis for interacting with scan service
 	sender     SkySender  // sender provides apis for sending skycoin
 	store      *store     // deposit info storage
+	mut        sync.Mutex
 	quit       chan struct{}
 }
 
@@ -169,6 +171,35 @@ func NewService(log logrus.FieldLogger, db *bolt.DB, scanner, skyScanner, ethSca
 	}
 }
 
+func (s *Service) SetRate(cointype string, rate int) error {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	switch cointype {
+	case "bitcoin":
+		s.cfg.Rate = int64(rate)
+	case "ethcoin":
+		s.cfg.EthRate = int64(rate)
+	case "skycoin":
+		s.cfg.SkyRate = int64(rate)
+	default:
+		return errors.New("unsupport cointype")
+	}
+	return nil
+}
+func (s *Service) GetRate(cointype string) (int, error) {
+	var rate int64
+	switch cointype {
+	case "bitcoin":
+		rate = s.cfg.Rate
+	case "ethcoin":
+		rate = s.cfg.EthRate
+	case "skycoin":
+		rate = s.cfg.SkyRate
+	default:
+		return 0, errors.New("unsupport cointype")
+	}
+	return int(rate), nil
+}
 func (s *Service) HandleErrorDeposit(dv scanner.DepositNote, btcTxIndex string, err error) error {
 	log := s.log
 	// TODO, can rewrite this method a little better

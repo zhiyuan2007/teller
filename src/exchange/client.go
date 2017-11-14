@@ -18,6 +18,16 @@ func (ec *Client) BindAddress(cAddr, skyAddr, ct string) error {
 	return ec.s.bindAddress(cAddr, skyAddr, ct)
 }
 
+//SetRate set exhange rate
+func (ec *Client) SetRate(cointype string, rate int) error {
+	return ec.s.SetRate(cointype, rate)
+}
+
+//GetRate return exhange rate
+func (ec *Client) GetRate(cointype string) (int, error) {
+	return ec.s.GetRate(cointype)
+}
+
 // GetDepositStatuses returns deamon.DepositStatus array of given skycoin address
 func (ec *Client) GetDepositStatuses(skyAddr, ct string) ([]DepositStatus, error) {
 	return ec.s.getDepositStatuses(skyAddr, ct)

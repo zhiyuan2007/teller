@@ -295,6 +295,8 @@ func (hs *httpServer) setupMux() *http.ServeMux {
 	// API Methods
 	handleAPI("/api/bind", httputil.LogHandler(hs.log, BindHandler(hs)))
 	handleAPI("/api/status", httputil.LogHandler(hs.log, StatusHandler(hs)))
+	handleAPI("/api/changerate", httputil.LogHandler(hs.log, ChangeRateHandler(hs)))
+	handleAPI("/api/rate", httputil.LogHandler(hs.log, GetRateHandler(hs)))
 
 	// Static files
 	mux.Handle("/", gziphandler.GzipHandler(http.FileServer(http.Dir(hs.Config.StaticDir))))
@@ -353,6 +355,19 @@ type bindRequest struct {
 	Address      string `json:"address"`
 	PlanCoinType string `json:"planTokenType"`
 	CoinType     string `json:"tokenType"`
+}
+type rateRequest struct {
+	Rate     int    `json:"rate"`
+	CoinType string `json:"tokenType"`
+}
+type coinRatePair struct {
+	CoinName string `json:"coin_name"`
+	CoinRate int    `json:"coin_rate"`
+}
+type RateResponse struct {
+	CoinType string         `json:"tokenType"`
+	Rate     int            `json:"rate"`
+	CoinPair []coinRatePair `json:"allcoin,omitempty"`
 }
 
 func makeUnifiedHTTPResponse(code int, data interface{}, errmsg string) UnifiedResponse {
@@ -519,6 +534,139 @@ func StatusHandler(hs *httpServer) http.HandlerFunc {
 	}
 }
 
+// ChangeRateHandler modify the exchange rate of specific skycoin address
+// Method: POST
+// Accept: application/json
+// URI: /api/changerate
+// Args:
+//     rate
+//     tokenType
+func ChangeRateHandler(hs *httpServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		log := logger.FromContext(ctx)
+
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		rateReq := &rateRequest{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&rateReq); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		defer r.Body.Close()
+
+		log = log.WithField("rateReq", rateReq)
+		ctx = logger.WithContext(ctx, log)
+		r = r.WithContext(ctx)
+
+		if rateReq.Rate == 0 {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("rate incorrect"))
+			return
+		}
+		if rateReq.CoinType == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("Missing tokenType"))
+			return
+		}
+
+		log.Info("Calling service.changerate")
+		//
+		//modified rate
+
+		hs.service.SetRate(rateReq.CoinType, rateReq.Rate)
+		ctx = logger.WithContext(ctx, log)
+		r = r.WithContext(ctx)
+
+		log.Info("change rate success")
+
+		tmp := RateResponse{CoinType: rateReq.CoinType, Rate: rateReq.Rate}
+		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
+
+		if err := httputil.JSONResponse(w, unifiedres); err != nil {
+			log.WithError(err).Error()
+		}
+	}
+}
+
+// RateHandler returns the rate of specified coin
+// Method: GET
+// URI: /api/rate
+// Args:
+//     tokenType
+func GetRateHandler(hs *httpServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		log := logger.FromContext(ctx)
+
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+			return
+		}
+
+		coinType := r.URL.Query().Get("tokenType")
+		if coinType == "" {
+			coinType = "all"
+			return
+		}
+
+		log = log.WithField("cointype", coinType)
+		ctx = logger.WithContext(ctx, log)
+		r = r.WithContext(ctx)
+
+		log.Info()
+
+		log.Info("handling rateRequest")
+
+		var rate int
+		var err error
+		var allcoins [3]coinRatePair
+		if coinType == "all" {
+			btcrate, _ := hs.service.GetRate("bitcoin")
+			allcoins[0] = coinRatePair{CoinName: "bitcoin", CoinRate: btcrate}
+			ethrate, _ := hs.service.GetRate("ethcoin")
+			allcoins[1] = coinRatePair{CoinName: "ethcoin", CoinRate: ethrate}
+			skyrate, _ := hs.service.GetRate("skycoin")
+			allcoins[2] = coinRatePair{CoinName: "skycoin", CoinRate: skyrate}
+		} else {
+			rate, err = hs.service.GetRate(coinType)
+			if err != nil {
+				// TODO -- these could be internal server error, gateway error
+				log.WithError(err).Error("service.GetRate failed")
+				errorResponse(ctx, w, http.StatusBadRequest, err)
+				return
+			}
+		}
+
+		log = log.WithFields(logrus.Fields{
+			"coinType": coinType,
+			"rate":     rate,
+		})
+		ctx = logger.WithContext(ctx, log)
+		r = r.WithContext(ctx)
+
+		log.Info("Got rate")
+
+		var tmp RateResponse
+		if coinType == "all" {
+			tmp = RateResponse{CoinType: coinType, Rate: 0, CoinPair: allcoins[:]}
+		} else {
+			tmp = RateResponse{CoinType: coinType, Rate: rate}
+		}
+		unifiedres := makeUnifiedHTTPResponse(0, tmp, "")
+		if err := httputil.JSONResponse(w, unifiedres); err != nil {
+			log.WithError(err).Error()
+		}
+	}
+}
 func readyToStart(ctx context.Context, w http.ResponseWriter, startAt time.Time) bool {
 	if time.Now().UTC().After(startAt.UTC()) {
 		return true
