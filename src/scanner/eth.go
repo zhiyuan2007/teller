@@ -275,7 +275,7 @@ func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]D
 			continue
 		}
 		amt := tx.Value().Int64()
-		a := to.String()
+		a := strings.ToLower(to.String())
 		if _, ok := addrMap[a]; ok {
 			dv = append(dv, DepositValue{
 				Address: a,
