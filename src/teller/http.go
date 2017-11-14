@@ -615,7 +615,6 @@ func GetRateHandler(hs *httpServer) http.HandlerFunc {
 		coinType := r.URL.Query().Get("tokenType")
 		if coinType == "" {
 			coinType = "all"
-			return
 		}
 
 		log = log.WithField("cointype", coinType)

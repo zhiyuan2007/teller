@@ -124,7 +124,7 @@ func (s *BTCScanner) Run() error {
 
 	fmt.Printf("history height %d, init height %d\n", height, s.cfg.InitialScanHeight)
 
-	if height < s.cfg.InitialScanHeight {
+	if s.cfg.InitialScanHeight == 0 {
 		height = s.cfg.InitialScanHeight
 	}
 

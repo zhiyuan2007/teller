@@ -118,7 +118,10 @@ func (s *SKYScanner) Run() error {
 	})
 
 	seq := height
-	if height == 0 {
+	if s.cfg.InitialScanHeight == 0 {
+		seq = 0
+	}
+	if seq == 0 {
 		// the first time the bot start
 		// get the best block
 		block, err := s.getBestBlock()

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/ethereum/go-ethereum/common"
@@ -126,7 +127,7 @@ func (s *ETHScanner) Run() error {
 
 	currentheight := height
 
-	if currentheight < s.cfg.InitialScanHeight {
+	if s.cfg.InitialScanHeight == 0 {
 		currentheight = s.cfg.InitialScanHeight
 	}
 
