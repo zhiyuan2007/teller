@@ -5,6 +5,7 @@ package exchange
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -367,6 +368,13 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		log.Warn("skycoin amount is 0, not sending")
 		return nil
 	}
+	fmt.Printf("spaco at droplets---%+v\n", skyAmt)
+
+	coinValue := skyAmt/1e6 + 1
+	fmt.Printf("coinVlaule[int] ---%+v\n", coinValue)
+	s32 := strconv.FormatInt(int64(coinValue), 10)
+	fmt.Printf("[formatInt] %+v\n", s32)
+	skyAmt = uint64(coinValue * 1e6)
 
 	rspC := s.sender.SendAsync(skyAddr, skyAmt)
 	var rsp sender.Response
@@ -376,16 +384,14 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		log.Warn("exhange.Service quit")
 		return errors.New("exchange.Service quit")
 	}
-	coinValue := float64(skyAmt) / 1e6
-	s32 := strconv.FormatFloat(coinValue, 'f', -1, 32)
-	sms.Sendmsg(skyAddr, s32, "spocoin")
-	log = log.WithField("response", rsp)
 
 	if rsp.Err != "" {
 		log.Error("Send skycoin failed")
 		dv.AckC <- struct{}{}
 		return nil
 	}
+	sms.Sendmsg(skyAddr, s32, "spocoin")
+	log = log.WithField("response", rsp)
 
 	log.Info("Sent skycoin")
 
