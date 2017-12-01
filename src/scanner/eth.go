@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sirupsen/logrus"
+	"github.com/spaco/teller/src/util/dbutil"
 )
 
 var (
@@ -275,7 +276,8 @@ func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]D
 			//-fmt.Printf("this is a contract transcation +%v\n", tx)
 			continue
 		}
-		amt := tx.Value().Int64()
+		//1 eth = 1e18 wei, so tx.Value() is very big that may overflow(int64) ,so store it by Gwei and recover it when used
+		amt := dbutil.Wei2Gwei(tx.Value())
 		a := strings.ToLower(to.String())
 		if _, ok := addrMap[a]; ok {
 			dv = append(dv, DepositValue{

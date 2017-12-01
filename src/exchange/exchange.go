@@ -6,6 +6,7 @@ package exchange
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"sync"
 	"time"
@@ -60,8 +61,7 @@ func calculateSkyValue(satoshis, skyPerBTC int64) (uint64, error) {
 
 	skyToDroplets := decimal.New(droplet.Multiplier, 0)
 	droplets := sky.Mul(skyToDroplets)
-
-	amt := droplets.IntPart()
+	amt := big.NewInt(1).Div(big.NewInt(droplets.IntPart()), big.NewInt(1000000)).Uint64() * 1000000
 	if amt < 0 {
 		// This should never occur, but double check before we convert to uint64,
 		// otherwise we would send all the coins due to integer wrapping.
@@ -104,16 +104,15 @@ func calculateSkyValueForSpa(droplets, skyPerSPA int64) (uint64, error) {
 // calculateSkyValueForEth returns the amount of SKY (in wei) to give for an
 // amount of Eth (in wei).
 // Rate is measured in SKY per Eth
-func calculateSkyValueForEth(wei, skyPerEth int64) (uint64, error) {
-	if wei < 0 || skyPerEth < 0 {
-		return 0, errors.New("negative wei or negative skyPerEth")
+func calculateSkyValueForEth(wei *big.Int, skyPerEth int64) (uint64, error) {
+	if wei.Sign() < 0 {
+		return 0, errors.New("wei must be greater than or equal to 0")
 	}
+	rate := decimal.New(skyPerEth, 0)
 
-	eth := decimal.New(wei, 0)
+	eth := decimal.NewFromBigInt(wei, 0)
 	ethToWei := decimal.New(weiPerEth, 0)
 	eth = eth.DivRound(ethToWei, 18)
-
-	rate := decimal.New(skyPerEth, 0)
 
 	sky := eth.Mul(rate)
 	sky = sky.Truncate(daemon.MaxDropletPrecision)
@@ -121,7 +120,11 @@ func calculateSkyValueForEth(wei, skyPerEth int64) (uint64, error) {
 	skyToDroplets := decimal.New(droplet.Multiplier, 0)
 	droplets := sky.Mul(skyToDroplets)
 
-	amt := droplets.IntPart()
+	// floor (x / e6) * e6
+	divisor := decimal.New(droplet.Multiplier, 0)
+	dropletsInt := droplets.DivRound(divisor, 6).IntPart()
+
+	amt := dropletsInt * droplet.Multiplier
 	if amt < 0 {
 		// This should never occur, but double check before we convert to uint64,
 		// otherwise we would send all the coins due to integer wrapping.
@@ -353,7 +356,7 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 		}
 	case "ethcoin":
 		log = log.WithField("skyRate", s.cfg.EthRate)
-		skyAmt, err = calculateSkyValueForEth(dv.Value, s.cfg.EthRate)
+		skyAmt, err = calculateSkyValueForEth(dbutil.Gwei2Wei(dv.Value), s.cfg.EthRate)
 		if err != nil {
 			log.WithError(err).Error("calculateSkyValue failed")
 			return nil
@@ -370,7 +373,7 @@ func (s *Service) StartSender(dv scanner.DepositNote, ok bool, depositType strin
 	}
 	fmt.Printf("spaco at droplets---%+v\n", skyAmt)
 
-	coinValue := skyAmt/1e6 + 1
+	coinValue := skyAmt / 1e6
 	fmt.Printf("coinVlaule[int] ---%+v\n", coinValue)
 	s32 := strconv.FormatInt(int64(coinValue), 10)
 	fmt.Printf("[formatInt] %+v\n", s32)

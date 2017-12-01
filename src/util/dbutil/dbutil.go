@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/boltdb/bolt"
 )
@@ -158,4 +159,11 @@ func ForEach(tx *bolt.Tx, bktName []byte, f func(k, v []byte) error) error {
 
 func ByteJoin(tupledata []byte, ct, sep string) []byte {
 	return bytes.Join([][]byte{tupledata, []byte(ct)}, []byte(sep))
+}
+
+func Wei2Gwei(wei *big.Int) int64 {
+	return big.NewInt(1).Div(wei, big.NewInt(1e9)).Int64()
+}
+func Gwei2Wei(gwei int64) *big.Int {
+	return big.NewInt(1).Mul(big.NewInt(gwei), big.NewInt(1e9))
 }
