@@ -264,13 +264,7 @@ func scanETHBlock(s *ETHScanner, block *types.Block, depositAddrs []string) ([]D
 	}
 
 	var dv []DepositValue
-	for i, txid := range block.Transactions() {
-
-		tx, err := s.GetTransaction(txid.Hash())
-		if err != nil {
-			fmt.Printf("------wrong get transcation %s\n-----", txid.Hash().String())
-			continue
-		}
+	for i, tx := range block.Transactions() {
 		to := tx.To()
 		if to == nil {
 			//-fmt.Printf("this is a contract transcation +%v\n", tx)
